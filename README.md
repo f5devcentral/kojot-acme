@@ -33,7 +33,7 @@ Installation to the BIG-IP is simple. The only constraint is that the certificat
 * ${\normalsize{\textbf{\color{red}Step\ 1}}}$ (Install): SSH to the BIG-IP shell and run the following command. This will install all required components to the /shared/acme folder on the BIG-IP. In an HA environment, perform this action on both BIG-IP instances.
 
     ```bash
-    curl -s https://raw.githubusercontent.com/kevingstewart/f5acmehandler-bash/main/install.sh | bash
+    curl -s https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash
     ```
 
 * ${\normalsize{\textbf{\color{red}Step\ 2}}}$ (Global Configuration): Update the new ```dg_acme_config``` data group and add entries for each managed domain (certificate subject). You must minimally include the subject/domain (key) and a corresponding ```--ca``` value. In an HA environment, this data group is synced between the peers. See the **Global Configuration Options** section below for additional details. Examples:
@@ -341,7 +341,7 @@ Working with BIG-IQ primarily involves "Script Management", and can broken down 
       - Script:
 
       ```
-      curl -s https://raw.githubusercontent.com/kevingstewart/f5acmehandler-bash/main/install.sh | bash
+      curl -s https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash
       ```
       - Save & Close
    
@@ -428,7 +428,7 @@ Verbosity is set in the ssmtp command so the full transaction will dump to stdou
 To uninstall all objects:
 
 ```bash
-curl -s https://raw.githubusercontent.com/kevingstewart/f5acmehandler-bash/main/uninstall.sh | bash
+curl -s https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/uninstall.sh | bash
 ```
 
 ***Note** that the dg_acme_challenge data group, and acme_handler_rule iRule are not deleted in the uninstall script, as they are referenced outside of the ```f5acmehandler.sh``` utility.*
@@ -486,7 +486,7 @@ There are a number of ways to test the ```f5acmehandler``` utility, including va
 * On the BIG-IP, install the f5acmehandler utility components on the BIG-IP instance. SSH to the BIG-IP shell and run the following command:
 
     ```bash
-    curl -s https://raw.githubusercontent.com/kevingstewart/f5acmehandler-bash/main/install.sh | bash
+    curl -s https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash
     ```
     
 * Install the **Smallstep Step-CA** ACME server instance on a local Linux machine. Adjust the local /etc/hosts DNS entries at the bottom of the docker-compose YAML file accordingly to allow the ACME server to locally resolve your ACME client instance (the set of BIG-IP HTTP virtual servers). This command will create an ACME service listening on HTTPS port 9000.
@@ -533,7 +533,7 @@ There are a number of ways to test the ```f5acmehandler``` utility, including va
 ${\LARGE{\textnormal{\textbf{\color{blue}Credits}}}}$
 
 Special thanks to: 
-- [@f5-rahm](https://github.com/f5-rahm) and his [lets-encrypt-python](https://github.com/f5devcentral/lets-encrypt-python) project for inspiration
+- [@f5-rahm](https://github.com/f5-rahm) and his [lets-encrypt-python](https://github.com/f5devcentral/lets-encrypt-python) project for inspiration, and for coming up with the cool project name. ;)
 - [@Lukas2511](https://github.com/Lukas2511) for the [dehydrated ACME client utility](https://github.com/dehydrated-io/dehydrated)
 
 <br />
