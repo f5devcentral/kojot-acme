@@ -1,0 +1,129 @@
+version: '3.3'
+services:
+  step-ca:
+    container_name: smallstep
+    image: smallstep/step-ca
+    user: 0:0
+    volumes:
+      - './step:/home/step'
+    ports:
+      - '9000:9000'
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ## Generate password file
+        if [[ ! -f /home/step/password.txt ]]
+        then
+           echo '{m2*F!fhAsY6sP&*=lLtYMIu)J_T6kVH█' > /home/step/password.txt
+        fi
+
+        ## Import rootca key (f5labs.com)
+        if [[ ! -f /home/step/rootca.key ]]
+        then
+        cat > /home/step/rootca.key <<EOF
+        -----BEGIN RSA PRIVATE KEY-----
+        MIIEowIBAAKCAQEAuSFJGHLO3pHhFjBkIdnYO0MYtWkG+0YZp54ldzts41A5vUww
+        ZIVggf1CtL69YiCWrllnkHADNQFORFChFthC5m6uwwSmxI4UnJ1+HmS0+vYyofNg
+        uMt0W0lnDYTq5ZXrkBN5/yKiQX1rDUxYQaEbiCRsO4wkCD1Cz0ydZ+NAr6kkUfIn
+        NMQwvl3K1+cYtDxvgb/IEvVS8NhBYPc37qmfRq3Iuf+D84Enj4vXty+0scXiWfxG
+        zUlCk26twyIEb7jGaLR/XZsmU8bwGMjrizs1KzVccz94LydpApMHFreDW243/Xge
+        knBIv0lDSk1S69TRmA4Dd4JZhLzLgxh6DM3IowIDAQABAoIBAAVaYAmz8CVhZHfG
+        yG5uJSF5jDJaqhgD6+P736t17W0ZOcIufMu7S5IWp6IgTcuTk6fQ7/yuMHmM4x14
+        k1/cuvp8wtLixIu0bAYnS6lHUjBbhBVIu0g8oc2t7qvmZwBieGA/H+zvrG9mV/0X
+        cwnaxbgHDZYfND+EvfTOi1KgsJMjrUWszc51RVQ90wKXdaBhqywLA2/GumJg4EFi
+        lodw2J/Wbr+dGfquf8rdsLA1nwwPPMkYMJ2AHLEKEumkelUePiepYqvXOtsJqigI
+        4LdCaKDQJjzyeMBqbjv4dejbb6IjHz4eeYFV9QjYpzvyom4G6K96nIK7OoXspUwL
+        Zd6J3NECgYEA7OcLidHbBx+WwWbomdTFFXquJQxe/hzESZN+w1Tt73dOvqj36G3J
+        sqfC9/LtUfPkcLtersoiTAyhM7GQoVS4vsfzIzXjZltq0xDWXWDo42Sz7dD3NooU
+        /Xo0NiqTHoONPLNDQdqwS2PAVZCXvsc7VJ9MLUbbplFTimPaO4NoJTkCgYEAyA3P
+        2q7Sfu3rv31b8zV67KRKlLv+d0M5TY0NeVMqDGQZqGN00S7sNrauUjQS7wK9QpAH
+        aQrBE9I3QrgVgsWLReseQi/WL8pbrpDtL3JxrRFgdnTLm1yAs+NUKPWv4MfV/ODf
+        ZkR0JyCtQfEdaeegjUP2qMCx4Ndj9LOdoZFnWLsCgYBjmSuHsNvV3dkCzKIj8ok9
+        Y4uNdesGCNAZYtJbivxRviY0EFPRuz6eRtu4ZMCTwOcc4hmHgOH0eSbY1eFJgpX9
+        V5EID6LgKLT7sct+DL08xNzEsiMNIfZ7LwJ+d13M6V/a0j8Hk8qkl3aIQrcZdSej
+        hyl+q5izDuQBfcOFW9TQOQKBgQDFqF/lwTVZE9oJqOJgukZp6SmHKveQ/mpvpR3a
+        8cBp3b08Eogo5iOdK4Gw1qKeZCZ6zbOEpYt++gR/d0JJosSooFWVL46ASX+sSqUO
+        bBTE2pZkc6F4Lz06fzF4BsdvYAKdh9EyShA5WJ/Wt1RIfwKykKP0t+8IJ8gqzgzA
+        xdlGYQKBgDY9qObGV+3RXMZLUuyurZoiRCvrSpUwz84LxMBX9GO+p+RKZ2JFR7Uv
+        /dAejO3FWHBCYbblpM57/LfFzByISqOlDlEOUMO6zMKMa+libHrPsOJ4/b6n6PaR
+        yq2Hh8HxRgiLu6lybMPfN1VH6/3Fg82nKtiPBN4Xt22/XWiHtBbf
+        -----END RSA PRIVATE KEY-----
+        EOF
+        fi
+
+        ## Import rootca cert (f5labs.com)
+        if [[ ! -f /home/step/rootca.crt ]]
+        then
+        cat > /home/step/rootca.crt <<EOF
+        -----BEGIN CERTIFICATE-----
+        MIIDoTCCAomgAwIBAgIJAL859gCV8N/6MA0GCSqGSIb3DQEBCwUAMFcxCzAJBgNV
+        BAYTAlVTMRMwEQYDVQQKEwpmNWxhYnMuY29tMR4wHAYDVQQLExVDZXJ0aWZpY2F0
+        ZSBBdXRob3JpdHkxEzARBgNVBAMTCmY1bGFicy5jb20wHhcNMTkwMjI3MTA0NjAw
+        WhcNMzAwNTE2MTA0NjAwWjBXMQswCQYDVQQGEwJVUzETMBEGA1UEChMKZjVsYWJz
+        LmNvbTEeMBwGA1UECxMVQ2VydGlmaWNhdGUgQXV0aG9yaXR5MRMwEQYDVQQDEwpm
+        NWxhYnMuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuSFJGHLO
+        3pHhFjBkIdnYO0MYtWkG+0YZp54ldzts41A5vUwwZIVggf1CtL69YiCWrllnkHAD
+        NQFORFChFthC5m6uwwSmxI4UnJ1+HmS0+vYyofNguMt0W0lnDYTq5ZXrkBN5/yKi
+        QX1rDUxYQaEbiCRsO4wkCD1Cz0ydZ+NAr6kkUfInNMQwvl3K1+cYtDxvgb/IEvVS
+        8NhBYPc37qmfRq3Iuf+D84Enj4vXty+0scXiWfxGzUlCk26twyIEb7jGaLR/XZsm
+        U8bwGMjrizs1KzVccz94LydpApMHFreDW243/XgeknBIv0lDSk1S69TRmA4Dd4JZ
+        hLzLgxh6DM3IowIDAQABo3AwbjAvBglghkgBhvhCAQ0EIhYgT3BlblNTTCBnZW5l
+        cmF0ZWQgQ0EgY2VydGlmaWNhdGUwHQYDVR0OBBYEFEoQGb5szH9/+K832NzHSZ1b
+        JtC+MA8GA1UdEwEB/wQFMAMBAf8wCwYDVR0PBAQDAgGGMA0GCSqGSIb3DQEBCwUA
+        A4IBAQCBGj/nKgjS4JjKt6GvPbVEiTBwv2WBejJ97ozCMkdWCmMEESJ9lkVruIOI
+        BbfXxOXHSxhXPrQXQjCy0zPXG1beZSHhk1mKUoWK+JqMyxoNAQkDfLsdd34TApHW
+        kIItc4nxmGM4RoKWxqzAxsYr0e0fvHwiPoqvebNrVtxcdm7Zltng3l2O6uM/DiT/
+        IUa9IcD0LNAxOA0qF1GTJkglbjwRHEpNSfO0qg5WEfUEOHLi2M0aB3v7lZXmU6q4
+        Gt5YRbIFCDf25i+I4yqXWER5iyZgee7WNyiz3UJpasx5eZRqtK/FGFK9hKK9/35H
+        BrdlmzkznKUvswZmcvR7nXbxI5qv
+        -----END CERTIFICATE-----
+        EOF
+        fi
+
+        ## Trigger step ca init
+        if [[ ! -f /home/step/config/ca.json ]]
+        then
+        /usr/local/bin/step ca init \
+        --name=Smallstep \
+        --dns=localhost \
+        --dns=acme.f5labs.com \
+        --acme=true \
+        --deployment-type=standalone \
+        --address=:9000 \
+        --provisioner-password-file=/home/step/password.txt \
+        --password-file=/home/step/password.txt \
+        --provisioner="admin@f5labs.com" \
+        --root=/home/step/rootca.crt \
+        --key=/home/step/rootca.key
+       
+        ## Overwrite minted ECDSA intermediate cert/key with RSA cert/key
+        /usr/local/bin/step certificate create subca.f5labs.com \
+        /home/step/certs/intermediate_ca.crt \
+        /home/step/secrets/intermediate_ca_key \
+        --kty RSA \
+        --profile intermediate-ca \
+        --ca /home/step/certs/root_ca.crt \
+        --ca-key /home/step/rootca.key \
+        --no-password --insecure -f
+
+        ## Pause for 5 seconds
+        sleep 5
+        fi
+
+        ## Insert local hosts DNS entries (if needed for internal testing)
+        echo "172.16.1.151   foo.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   bar.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test1.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test2.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test3.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test4.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   www.f5labs.com" >> /etc/hosts
+
+        ## Start step-ca server
+        /usr/local/bin/step-ca --password-file /home/step/password.txt /home/step/config/ca.json
+
+
+
+        
