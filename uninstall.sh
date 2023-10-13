@@ -2,7 +2,7 @@
 
 ## Simple Dehydrated Acme (F5 BIG-IP) - Uninstall Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231006-1
+## Version: 20231013-1
 ## Description: Uninstall wrapper for Dehydrated Acme client and all components
 ##
 ## Usage:
