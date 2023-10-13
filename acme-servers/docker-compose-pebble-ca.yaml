@@ -1,0 +1,117 @@
+version: '3'
+services:
+  pebble:
+    container_name: pebble
+    image: letsencrypt/pebble:latest
+    volumes:
+      - ./:/configs
+    environment:
+      - "PEBBLE_ALTERNATE_ROOTS=1"
+      - "PEBBLE_VA_NOSLEEP=1"
+    ports:
+      - 14000:14000  # HTTPS ACME API
+      - 15000:15000  # HTTPS Management API
+    command: 
+      - /bin/sh
+      - -c
+      - |
+        ## Generate config.json file
+        if [[ ! -f /configs/config.json ]]
+        then
+        cat > /configs/config.json <<EOF
+        {
+          "pebble": {
+            "listenAddress": "0.0.0.0:14000",
+            "managementListenAddress": "0.0.0.0:15000",
+            "certificate": "/configs/ca-cert.pem",
+            "privateKey": "/configs/ca-key.pem",
+            "httpPort": 80,
+            "tlsPort": 5001,
+            "ocspResponderURL": "",
+            "externalAccountBindingRequired": false,
+            "domainBlocklist": ["blocked-domain.example"],
+            "retryAfter": {
+              "authz": 3,
+              "order": 5
+            }
+          }
+        }
+        EOF
+        fi
+
+        ## Import ca cert (subrsa.f5labs.com)
+        if [[ ! -f /configs/ca-cert.pem ]]
+        then
+        cat > /configs/ca-cert.pem <<EOF
+        -----BEGIN CERTIFICATE-----
+        MIID1jCCAr6gAwIBAgIBAjANBgkqhkiG9w0BAQsFADBXMQswCQYDVQQGEwJVUzET
+        MBEGA1UEChMKZjVsYWJzLmNvbTEeMBwGA1UECxMVQ2VydGlmaWNhdGUgQXV0aG9y
+        aXR5MRMwEQYDVQQDEwpmNWxhYnMuY29tMB4XDTE5MDIyNzEwNTE0OFoXDTMwMDUx
+        NjEwNTE0OFowXjELMAkGA1UEBhMCVVMxEzARBgNVBAoTCmY1bGFicy5jb20xHjAc
+        BgNVBAsTFVN1Ym9yZGluYXRlIEF1dGhvcml0eTEaMBgGA1UEAxMRc3VicnNhLmY1
+        bGFicy5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC3H/VTyUNC
+        vkqjxci3ypX3/QeIehFnxOj1qO09a0n91MvWBCgK4gM1hyEJ9nME6cVMu9bYGnJv
+        FA9rZwXGenwJ1LFkHBq94a6NSFcdcFawFek/qpJS4Q93jGTHtlQvZc77JxGn+aSv
+        1tSrw60v3t9UkQRCbCUp+DmBauKXmBt6s4Vg7Yc1Ot41tTs3Xv9Nc7TVonCjSms/
+        T3tOBX7/OWyvGU3kWWMiRKaGJFzMrQimELJFwC64K8NHKKKvdv029BuH8X8TluqG
+        yMZHlDam9s9pJqXIeZsDT+JGgppffvNMZfiWFEyNaj3hdVHE2WRLUh6eFli6PigJ
+        yG0h/Qz6r58lAgMBAAGjgaUwgaIwQgYJYIZIAYb4QgENBDUWM09wZW5TU0wgZ2Vu
+        ZXJhdGVkIHN1Ym9yZGluYXRlIGF1dGhvcml0eSBjZXJ0aWZpY2F0ZTALBgNVHQ8E
+        BAMCAYYwHQYDVR0OBBYEFKI+o3qMQR2u/xMNWuL1DGf/eIKyMB8GA1UdIwQYMBaA
+        FEoQGb5szH9/+K832NzHSZ1bJtC+MA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcN
+        AQELBQADggEBAAVlXhDW/LCLrJOjW0/x9ej83q4kHLWJYuLZl/SGe2KnyIknqkX1
+        Z0Vs+qs2wTtdJELsjWu+0WmwAaDHQzhpLV7lu+jRl0td1QeJoKnFbA/uTBIKKY3d
+        BfQUodywZ14bW/9cXUiUIye5dO9JGxNt+PVlgKdSYUU9D4mxOvjG0xuDyIDzD64d
+        J49hmhFTuqJRc0ps/Duqb0eaoDFITfNAgqBkUeWw4dsjYrTKpGVkrl2dWtk3GCFX
+        fpgc8qGDAmuq8Dt2O+2J1yNCDFx79OH+furhh5EUvNI5BiPy1zjrwz/W/JlOc0vg
+        GBlq13rqHWMmX8DV1xgSwS3oRdrsgr8p6hs=
+        -----END CERTIFICATE-----
+        EOF
+        fi
+
+        ## Import ca key (subrsa.f5labs.com)
+        if [[ ! -f /configs/ca-key.pem ]]
+        then
+        cat > /configs/ca-key.pem <<EOF
+        -----BEGIN RSA PRIVATE KEY-----
+        MIIEogIBAAKCAQEAtx/1U8lDQr5Ko8XIt8qV9/0HiHoRZ8To9ajtPWtJ/dTL1gQo
+        CuIDNYchCfZzBOnFTLvW2BpybxQPa2cFxnp8CdSxZBwaveGujUhXHXBWsBXpP6qS
+        UuEPd4xkx7ZUL2XO+ycRp/mkr9bUq8OtL97fVJEEQmwlKfg5gWril5gberOFYO2H
+        NTreNbU7N17/TXO01aJwo0prP097TgV+/zlsrxlN5FljIkSmhiRczK0IphCyRcAu
+        uCvDRyiir3b9NvQbh/F/E5bqhsjGR5Q2pvbPaSalyHmbA0/iRoKaX37zTGX4lhRM
+        jWo94XVRxNlkS1IenhZYuj4oCchtIf0M+q+fJQIDAQABAoIBADWsl1KUljNU5Tm1
+        egxsw6IpNvEInltk+scuWUL8VHaizZAQLdBqyHgDAGsUIkhZYKwKDoHO1qW6In7f
+        dnDja8HR5qCqIChxoqDkiCwnxjDcaz5u9251avwmWU+0IF64H3+7xtAOOvgTJsil
+        lPiIAbueubniSs5PZEOLmZjHS56dyngtKUEMVXS1LQiSYGGTHk5VXL6T4zeaEB0D
+        ofVhdqvYNsS0+3JsaPcGk0ou3wwTSOsWngBqakcByWH/1qvbEC9EqozYliVY2ICk
+        T7MvmP37Y7AEt9ufRWBZ2T8bvVztiBUD3I+ieYQlYGKoxHONYlukJsXt31Cx/2WI
+        wO/xSaECgYEA6dWgzIGSLmxDAnOUUNIv9MuEuz5tcAlxwstxliF4TPvEvhq1laOC
+        nplZ0n6pJxSEfpHeUPASMZJIhjAJTFAIghCDVhioVctKTBqbUXY8qW2cZv8RaECh
+        CQQo6WVRoD84Awm3EpQyhW5WgzFY1+LmA1tQIAgZhS2hPXU8kbIz7U0CgYEAyHvH
+        UcZcwWsHV4pYtX4A3PQJmNJPZaW3cvtMQ3oWvIC+Ar+HJb3gfdLqhWPoz40QugIQ
+        ruWB2ClF+naW9MEaAPymXOHjd1+rqHesTMnZ9S80PJUUWI0zHrmZHssDPplNSoBN
+        zKGogXDGtTNwP3rNct9tauXeySC3fZ4riCJubTkCgYB76YnpdWwqj5I+9VKONaPW
+        HBc9RkqmCUswh7CsdxYR7YUHnI3HOzuXofn4Ush+fh/sFo5x45YwkK0/9qqmtu6b
+        RfbjI/Poau73P045L+fbfMtZxSbLURxE8+BeNiO4QGgFLBvIi6HuFVdg9EB5PrLW
+        6oeeQcyMR27fa4XqSz27LQKBgDq4HkHyQlqYOXdHWwIVXLVaeLEc8ApKhjeUKNse
+        mCgv4Pc3F6NTQLw5mVzmTVr06zA/yJkhOW2RcSCRuVcIc9BUL3nG43OkPsfB/WIk
+        QMVSRQ91bpcdDBr0q0dcmJ+uEPhAKglEU/FNkbWi0j6VfjUmAYsstprcDUIqoH9n
+        7kXpAoGAU+KHZNtlO6CghVYwANDyo0x4lZQH1zgHgkrnkWqiEIiNzz6YUasjUgJl
+        zwr9fcEOy+fnddruBAx5YWJGuvssXp5lgvH1bu4rljhkTz6ee05Cog80p8LPmvlo
+        REs4Qps547E/ICMEmxln7dj+T0RtvXfGlrt+DioD3YF/ciXAA7M=
+        -----END RSA PRIVATE KEY-----
+        EOF
+        fi
+
+        ## Insert local hosts DNS entries (if needed for internal testing)
+        echo "172.16.1.151   foo.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   bar.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test1.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test2.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test3.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   test4.f5labs.com" >> /etc/hosts
+        echo "172.16.1.151   www.f5labs.com" >> /etc/hosts
+
+        ## Start Pebble Acme server
+        pebble -config /configs/config.json -strict
