@@ -1,6 +1,6 @@
 ## F5 BIG-IP ACME Client (Dehydrated) Configuration File
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231006-1
+## Version: 20231013-1
 ## Description: Contains per-provider ACME client configuration settings
 
 
@@ -24,7 +24,7 @@ KEY_ALGO=rsa
 KEYSIZE="2048"
 
 # E-mail to use during the registration (default: <unset>)
-CONTACT_EMAIL=stew@f5labs.com
+CONTACT_EMAIL=admin@foo.com
 
 # Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no)
 OCSP_MUST_STAPLE="yes"
