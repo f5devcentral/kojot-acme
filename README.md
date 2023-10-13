@@ -492,7 +492,7 @@ There are a number of ways to test the ```f5acmehandler``` utility, including va
 * Install the **Smallstep Step-CA** ACME server instance on a local Linux machine. Adjust the local /etc/hosts DNS entries at the bottom of the docker-compose YAML file accordingly to allow the ACME server to locally resolve your ACME client instance (the set of BIG-IP HTTP virtual servers). This command will create an ACME service listening on HTTPS port 9000.
 
     ```bash
-    git clone https://github.com/kevingstewart/f5acmehandler-bash.git
+    git clone https://github.com/f5devcentral/kojot-acme.git
     cd f5acmehandler-bash/acme-servers/
     docker-compose -f docker-compose-smallstep-ca.yaml up -d
     ```
