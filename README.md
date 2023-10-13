@@ -18,7 +18,7 @@ This project defines a set of utility functions for the [Dehydrated](https://git
 
 <br />
 
-Why **Kojot**? Often pronounce "koyot", this ia a word for "coyote" that has origins in Czech, Hungarian, Polish, and Serbo-Croatian languages. But most important, the most famous coyote you may know, Wile E. Coyote, was a great consumer of ACME services, so the name checks out. ;)
+Why **Kojot**? Often pronounce "koyot", this is a word for "coyote" that has origins in Czech, Hungarian, Polish, and Serbo-Croatian languages. But most important, the most famous coyote you may know, Wile E. Coyote, was a great consumer of ACME services, so the name checks out. ;)
 
 <br />
 
