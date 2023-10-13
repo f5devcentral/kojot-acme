@@ -1,0 +1,40 @@
+## F5 BIG-IP ACME Client (Dehydrated) Reporting Configuration File
+## Maintainer: kevin-at-f5-dot-com
+## Version: 20231006-1
+## Description: Contains per-provider ACME client reporting configuration settings
+
+
+########################################################
+## REPORTING SETTINGS ##################################
+########################################################
+
+## Set to true to enable reporting
+ENABLE_REPORTING=false
+
+## Set to SMTP host:port
+MAILHUB=smtp.acme.net:587
+
+## Set to yes if SMTP server requires StartTLS
+USESTARTTLS=yes
+
+## Set to yes if SMTP server requires SSL/TLS
+USETLS=yes
+
+## Set username and password if SMTP server requires authentication
+AUTHUSER=foo
+AUTHPASS=bar
+
+## Set email address of sender
+REPORT_FROM="admin@foo.com"
+
+## Set email address of recipient
+REPORT_TO="foo@foo.com"
+
+## Set email report Subject line
+REPORT_SUBJECT="BIG-IP ACMEv2 Renewal Report"
+
+## Set this to the local path of a CA certificate bundle file for validating SMTP server certificate
+TLS_CA_FILE=/shared/acme/ca-bundle.crt
+
+## Set to yes to override the From Line (needed by utility script)
+FROMLINEOVERRIDE=yes
