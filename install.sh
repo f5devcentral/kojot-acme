@@ -11,7 +11,7 @@
 
 ## Set download paths
 acmeclient_url="https://raw.githubusercontent.com/dehydrated-io/dehydrated/master"
-f5acmehandler_url="https://raw.githubusercontent.com/kevingstewart/simple-dehydrated-acme/main"
+f5acmehandler_url="https://raw.githubusercontent.com/f5devcentral/kojot-acme/main"
 
 
 ## Download and place files
@@ -20,6 +20,7 @@ curl -s ${acmeclient_url}/dehydrated -o /shared/acme/dehydrated && chmod +x /sha
 curl -s ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
 curl -s ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
 curl -s ${f5acmehandler_url}/config -o /shared/acme/config
+curl -s ${f5acmehandler_url}/config -o /shared/acme/config_reporting
 
 
 ## Create BIG-IP data groups (dg_acme_challenge, dg_acme_config)
