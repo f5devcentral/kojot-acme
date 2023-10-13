@@ -1,0 +1,86 @@
+## F5 BIG-IP ACME Client (Dehydrated) Configuration File
+## Maintainer: kevin-at-f5-dot-com
+## Version: 20231006-1
+## Description: Contains per-provider ACME client configuration settings
+
+
+
+########################################################
+## COMMON SETTINGS #####################################
+########################################################
+
+# Extra options passed to the curl binary (default: <unset>)
+# Common options:
+#   --http1.1          = use HTTP/1.1
+#   -k                 = ignore certificate errors
+#   -x <proxy-url>     = use an explicit proxy
+# Ex. CURL_OPTS="--http1.1 -k -x 10.1.10.150:3128"
+CURL_OPTS="--http1.1 -k"
+
+# Which public key algorithm should be used? Supported: rsa, prime256v1 and secp384r1 (overridden by -a commandline option)
+KEY_ALGO=rsa
+
+# Default keysize for private keys (default: 4096)
+KEYSIZE="2048"
+
+# E-mail to use during the registration (default: <unset>)
+CONTACT_EMAIL=stew@f5labs.com
+
+# Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no)
+OCSP_MUST_STAPLE="yes"
+
+## Threshold in days when a certificate must be renewed (default: 30 days)
+THRESHOLD=30
+
+## Set to true to always generate a private key. Otherwise a CSR is created from an existing key to support HSM/FIPS environments (default: false)
+ALWAYS_GENERATE_KEY=false
+
+## Set to true to attempt OCSP revocation check on existing certificates (default: false)
+CHECK_REVOCATION=false
+
+## Set to true to generate error logging (default: true)
+ERRORLOG=true
+
+## Set to true to generate debug logging (default: false)
+DEBUGLOG=true
+
+
+
+########################################################
+## ADVANCED SETTINGS ###################################
+########################################################
+
+# Minimum days before expiration to automatically renew certificate (default: 30)
+#RENEW_DAYS="30"
+
+# Fetch OCSP responses (default: no)
+#OCSP_FETCH="yes"
+
+# OCSP refresh interval (default: 5 days)
+#OCSP_DAYS=5
+
+# Extended Account Binding (EAB) support
+#EAB_KID=kid-1
+#EAB_HMAC_KEY=zWNDZM6eQGHWpSRTPal5eIUYFTu7EajVIoguysqZ9wG44nMEtx3MUAsUDkMTQ12W
+
+## Set to true to install the complete certificate chain, or false to only install the leaf certificate (default: true)
+#FULLCHAIN=true
+
+## Set the preferred number of zeroization cycles for shredding created private keys (default: 3 cycles)
+#ZEROCYCLE=3
+
+## Set to true to generate new client SSL profiles with new certs/keys (default: false)
+#CREATEPROFILE=false
+
+
+
+########################################################
+## STATIC SETTINGS - DO NOT TOUCH ######################
+########################################################
+
+# Output directory for challenge-tokens to be served by webserver or deployed in HOOK (default: /var/www/dehydrated)
+WELLKNOWN="/tmp/wellknown"
+
+# Program or function called in certain situations
+# BASEDIR and WELLKNOWN variables are exported and can be used in an external program
+HOOK=${BASEDIR}/f5hook.sh
