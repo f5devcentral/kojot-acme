@@ -2,7 +2,7 @@
 
 ## Simple Dehydrated Acme (F5 BIG-IP) - Install Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231006-1
+## Version: 20231013-1
 ## Description: Wrapper for Dehydrated Acme client to simplify usage on F5 BIG-IP
 ##
 ## Usage:
