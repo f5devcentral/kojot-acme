@@ -2,11 +2,11 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231006-1
+## Version: 20231013-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
-##    - Install: curl -s https://raw.githubusercontent.com/kevingstewart/f5acmehandler-bash/main/install.sh | bash
+##    - Install: curl -s https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash
 ##    - Update global config data group (dg_acme_config) - [domain] := --ca [acme-provider-url] [--config [config-path]]
 ##        www.foo.com := --ca https://acme-v02.api.letsencrypt.org/directory
 ##        www.bar.com := --ca https://acme.zerossl.com/v2/DV90 --config /shared/acme/config_www_example_com
