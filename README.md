@@ -7,13 +7,13 @@ This project defines a set of utility functions for the [Dehydrated](https://git
 * Simple installation, configuration, and scheduling
 * Supports renewal with existing private keys to enable certificate automation in HSM/FIPS environments
 * Supports per-domain configurations, and multiple ACME providers
-* Supports External Account Binding (EAB)
 * Supports OCSP and periodic revocation testing
-* Supports explicit proxy egress
+* Supports External Account Binding (EAB)
 * Supports SAN certificate renewal
+* Supports explicit proxy egress
 * Supports granular scheduling
-* Supports SMTP Reporting
 * Supports high availability
+* Supports SMTP Reporting
 * Supports debug logging
 
 <br />
