@@ -25,4 +25,4 @@ tmsh delete sys file ifile f5_acme_config_state > /dev/null 2>&1
 ## Delete /shared/acme folder and all contents
 rm -rf /shared/acme > /dev/null 2>&1
 
-return 0
+exit 0
