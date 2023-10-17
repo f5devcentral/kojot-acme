@@ -39,4 +39,4 @@ cp $(tmsh list sys file ssl-cert ca-bundle.crt -hidden |grep cache-path | sed -E
 ## Create the log file
 touch /var/log/acmehandler
 
-return 0
+exit 0
