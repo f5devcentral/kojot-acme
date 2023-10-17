@@ -493,7 +493,7 @@ There are a number of ways to test the ```f5acmehandler``` utility, including va
 
     ```bash
     git clone https://github.com/f5devcentral/kojot-acme.git
-    cd f5acmehandler-bash/acme-servers/
+    cd kojot-acme/acme-servers/
     docker-compose -f docker-compose-smallstep-ca.yaml up -d
     ```
 
