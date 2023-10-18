@@ -17,6 +17,9 @@
 ##    - Set a cron-based schedule: cd /shared/acme && ./f5acmehandler.sh --schedule "00 04 * * 1"
 
 
+## PLEASE DO NOT EDIT THIS SCRIPT ##
+
+
 ## ================================================== ##
 ## FUNCTIONS ======================================== ##
 ## ================================================== ##
