@@ -62,6 +62,8 @@ Installation to the BIG-IP is simple. The only constraint is that the certificat
     ./f5acmehandler.sh --schedule "00 04 * * 1"
     ```
 
+* ${\normalsize{\textbf{\color{red}Step\ 7}}}$ (Client SSL Profile):  The ```f5acmehandler.sh``` utility maintains the freshness of the certificates (and private keys) installed on the BIG-IP. Ultimately, these certificates and keys will then need to be applied to SSL profiles, and the SSL profiles applied to application virtual servers. Creating the SSL profiles and virtual servers is outside the scope of this utility, but optionally you can set the **CREATEPROFILE** option in the client config file to 'true' to have the utility create a client SSL profile if missing, and attach the certificate and key to that profile.
+
 <br />
 
 ------------
