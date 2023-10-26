@@ -9,7 +9,7 @@
 ## - Execute: curl -s https://<this-repo-url>/install.sh | bash
 ##
 ##   Optionally include --proxy argument to specify an egress proxy (note double set of double-dashes)
-##            curl -s https://<this-repo-url>/install.sh | bash -s -- --proxy 172.16.1.144:3128
+##            curl -ks -x 172.16.1.144:3128 https://<this-repo-url>/install.sh | bash -s -- --proxy 172.16.1.144:3128
 
 
 ## Set download paths
