@@ -2,11 +2,11 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231013-1
+## Version: 20231206-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
-##    - Install: curl -s https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash
+##    - Install: curl -s https://raw.githubusercontent.com/kevingstewart/f5acmehandler-bash/main/install.sh | bash
 ##    - Update global config data group (dg_acme_config) - [domain] := --ca [acme-provider-url] [--config [config-path]]
 ##        www.foo.com := --ca https://acme-v02.api.letsencrypt.org/directory
 ##        www.bar.com := --ca https://acme.zerossl.com/v2/DV90 --config /shared/acme/config_www_example_com
@@ -37,6 +37,8 @@ CONFSTATEEXISTS="no"
 THISCONFIG=""
 SAVECONFIG="no"
 ENABLE_REPORTING=false
+FORCE_SYNC=false
+DEVICE_GROUP=""
 MAILHUB=""
 USESTARTTLS=no
 USETLS=no
@@ -48,6 +50,7 @@ REPORT_TO=""
 REPORT_SUBJECT=""
 FROMLINEOVERRIDE=no
 REPORT=""
+HASCHANGED="false"
 
 
 ## Function: process_errors --> print error and debug logs to the log file
@@ -305,12 +308,14 @@ process_handler_config () {
    then
       process_errors "DEBUG: Certificate does not exist, or ALWAYS_GENERATE_KEY is true --> call generate_new_cert_key.\n"
       echo "    Certificate does not exist, or ALWAYS_GENERATE_KEY is true. Generating a new cert and key." >> ${REPORT}
+      HASCHANGED="true"
       generate_new_cert_key "$DOMAIN" "$COMMAND"
    
    elif [[ "$certexists" == "true" && "$CHECK_REVOCATION" == "true" && "$(process_revocation_check "${DOMAIN}")" == "revoked" ]]
    then
       process_errors "DEBUG: Certificate exists, CHECK_REVOCATION is enabled, and revocation check found that (${DOMAIN}) is revoked -- Fetching new certificate and key"
       echo "    Certificate exists, CHECK_REVOCATION is enabled, and revocation check found that (${DOMAIN}) is revoked -- Fetching new certificate and key." >> ${REPORT}
+      HASCHANGED="true"
       generate_new_cert_key "$DOMAIN" "$COMMAND"
    
    else
@@ -335,6 +340,7 @@ process_handler_config () {
       if [ $THRESHOLD -le $date_test ]
       then
          process_errors "DEBUG (handler: threshold) THRESHOLD ($THRESHOLD) -le date_test ($date_test) - Starting renewal process for ${DOMAIN}\n"
+         HASCHANGED="true"
          generate_cert_from_csr "$DOMAIN" "$COMMAND"
       else
          process_errors "DEBUG (handler: bypass) Bypassing renewal process for ${DOMAIN} - Certificate within threshold.\n"
@@ -431,9 +437,13 @@ process_put_configs() {
       then
          process_errors "DEBUG START/END account checksums are different or iFile state is missing - pushing account state data to iFile central store\n"
 
+         ## Update HASCHANGED flag
+         HASCHANGED="true"
+
          ## First compress and base64-encode the accounts folder and config files
          # tar -czf - accounts/ config* | base64 -w 0 > data.b64
-         tar -czf - "${ACMEDIR}/accounts/" | base64 -w 0 > "${ACMEDIR}/accounts.b64"
+         cd "${ACMEDIR}"
+         tar -czf - "./accounts/" | base64 -w 0 > "${ACMEDIR}/accounts.b64"
 
          ## Test if the iFile exists (f5_acme_account_state)
          ifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_account_state 2>&1)" =~ "was not found" ]] && ifileexists=false
@@ -457,9 +467,13 @@ process_put_configs() {
       then
          process_errors "DEBUG START/END config checksums are different or iFile state is missing - pushing config state data to iFile central store\n"
 
+         ## Update HASCHANGED flag
+         HASCHANGED="true"
+
          ## First compress and base64-encode the accounts folder and config files
          # tar -czf - accounts/ config* | base64 -w 0 > data.b64
-         tar -czf - "${ACMEDIR}/config*" | base64 -w 0 > "${ACMEDIR}/configs.b64"
+         cd "${ACMEDIR}"
+         tar -czf - ./config* | base64 -w 0 > "${ACMEDIR}/configs.b64"
 
          ## Test if the iFile exists (f5_acme_config_state)
          confifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_config_state 2>&1)" =~ "was not found" ]] && confifileexists=false
@@ -475,7 +489,14 @@ process_put_configs() {
          fi
       else
          process_errors "DEBUG START/END config checksums detects no changes - not pushing config state data to iFile central store\n"
-      fi      
+      fi
+
+      if [[ "$HASCHANGED" == "true" && "$FORCE_SYNC" == "true" ]]
+      then
+         ## The config has changed and FORCE_SYNC is set to true - force an HA sync
+         process_errors "DEBUG START/END config checksums are different and FORCE_SYNC is set to true - forcing an HA sync operation\n"
+         tmsh run /cm config-sync to-group ${DEVICE_GROUP}
+      fi
    fi
 }
 
@@ -707,3 +728,10 @@ main() {
 REPORT=$(mktemp)
 echo "ACMEv2 Renewal Report: $(date)\n\n" > ${REPORT}
 main "${@:-}"
+
+
+
+
+
+
+
