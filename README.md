@@ -111,25 +111,27 @@ www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa
 
 Within the ```/shared/acme/config``` file are a number of additional client attributes. This utility allows for per-domain configurations, for example, when EAB is needed for some providers, but not others. Adjust the following atttributes as required for your ACME provider(s). All additional config files **must** start with "config_" (ex. config_www_foo_com).
 
-| **Config Options**    | **Description**                                                                                                                                 |
-|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
-| CURL_OPTS             | Defines specific attributes used in the underlying Curl functions. This could minimally<br />include:<br /><br />--http1.1          = use HTTP/1.1<br />-k                 = ignore certificate errors<br />-x \<proxy-url\>     = use an explicit proxy                                                         |
-| KEY_ALGO              | Defines the required leaf certificate algorithm (rsa, prime256v1, or secp384r1)                                                                 |
-| KEYSIZE               | Defines the required leaf certificate key size (default: 4096)                                                                                  |
-| CONTACT_EMAIL         | Defines the registration account name and must be unique per provider requirements                                                              |
-| OCSP_MUST_STAPLE      | Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no)                                                                   |
-| THRESHOLD             | Threshold in days when a certificate must be renewed (default: 30 days)                                                                         |
-| ALWAYS_GENERATE_KEY   | Set to true to always generate a private key. Otherwise a CSR is created from an existing key to support HSM/FIPS environments (default: false) |
-| CHECK_REVOCATION      | Set to true to attempt OCSP revocation check on existing certificates (default: false)                                                          |
-| ERRORLOG              | Set to true to generate error logging (default: true)                                                                                           |
-| DEBUGLOG              | Set to true to generate debug logging (default: false)                                                                                          |
-| RENEW_DAYS            | Minimum days before expiration to automatically renew certificate (default: 30)                                                                 |
-| OCSP_FETCH            | Fetch OCSP responses (default: no)                                                                                                              |
-| OCSP_DAYS             | OCSP refresh interval (default: 5 days)                                                                                                         |
-| EAB_KID/EAB_HMAC_KEY  | Extended Account Binding (EAB) support                                                                                                          |
-| FULLCHAIN             | Set to true to install the complete certificate chain, or false to only install the leaf certificate (default: true)                            |
-| ZEROCYLE              | Set to preferred number of zeroization cycles for shredding created private keys (default: 3 cycles)                                            |
-| CREATEPROFILE         | Set to true to generate new client SSL profiles with new certs/keys (default: false)                                                            |
+| **Config Options** | **Description** |
+|---|---|
+| CURL_OPTS | Defines specific attributes used in the underlying Curl functions. This could minimally<br>include:<br><br>--http1.1          = use HTTP/1.1<br>-k                 = ignore certificate errors<br>-x \     = use an explicit proxy |
+| KEY_ALGO | Defines the required leaf certificate algorithm (rsa, prime256v1, or secp384r1) |
+| KEYSIZE | Defines the required leaf certificate key size (default: 4096) |
+| CONTACT_EMAIL | Defines the registration account name and must be unique per provider requirements |
+| OCSP_MUST_STAPLE | Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no) |
+| THRESHOLD | Threshold in days when a certificate must be renewed (default: 30 days) |
+| FORCE_SYNC | Option to force HA sync on certificate updates. When disabled, change data is stored to iFile object and requires an auto sync to ensure consistency. When this option is enabled, an HA sync is triggered when there is an update to any of the certificates. (default: false) |
+| DEVICE_GROUP | When FORCE_SYNC is true, you must also specify the BIG-IP Device Group name. |
+| ALWAYS_GENERATE_KEY | Set to true to always generate a private key. Otherwise a CSR is created from an existing key to support HSM/FIPS environments (default: false) |
+| CHECK_REVOCATION | Set to true to attempt OCSP revocation check on existing certificates (default: false) |
+| ERRORLOG | Set to true to generate error logging (default: true) |
+| DEBUGLOG | Set to true to generate debug logging (default: false) |
+| RENEW_DAYS | Minimum days before expiration to automatically renew certificate (default: 30) |
+| OCSP_FETCH | Fetch OCSP responses (default: no) |
+| OCSP_DAYS | OCSP refresh interval (default: 5 days) |
+| EAB_KID/EAB_HMAC_KEY | Extended Account Binding (EAB) support |
+| FULLCHAIN | Set to true to install the complete certificate chain, or false to only install the leaf certificate (default: true) |
+| ZEROCYLE | Set to preferred number of zeroization cycles for shredding created private keys (default: 3 cycles) |
+| CREATEPROFILE | Set to true to generate new client SSL profiles with new certs/keys (default: false) |
 </details>
 
 <details>
@@ -195,17 +197,22 @@ Provided below are detailed descriptions of the control flows. The **ACME Utilit
 <details>
 <summary><b>ACME Utility Architecture</b></summary>
 
-The f5acmehandler utility contains the following files and folders in the ```/shared/acme/``` folder on the BIG-IP:
+The f5acmehandler utility contains the following files and folders in the ```/shared/acme/``` folder on the BIG-IP, plus other BIG-IP objects:
 
-| **File/Folder**  | **Description**                                                                                                                |
-|------------------|--------------------------------------------------------------------------------------------------------------------------------|
-| accounts/        | The Folder containing registration information (subfolders) for each ACME provider.                                            |
-| certs/           | The Folder for ephemeral certificate information (CSRs, certificates), cleared after each ACME renewal operation.              |
-| config           | A text file containing the client configuration. Multiple provider-specific config files may be created as needed.             |
-| config_reporting | A text file containing the smtp reporting configuration.                                                                       |
-| dehydrated       | The ACME client script.                                                                                                        |
-| f5acmehandler.sh | The ACME client wrapper utility script. This is the script that gets scheduled, and handles all renewal processing.            |
-| f5hook.sh        | The ACME client hook script. This script is called by the ACME client to handle deploy challenge and clean challenge actions.  |
+| **File/Folder/Object** | **Description** |
+|---|---|
+| /shared/acme/accounts/ | The Folder containing registration information (subfolders) for each ACME provider. |
+| /shared/acme/certs/ | The Folder for ephemeral certificate information (CSRs, certificates), cleared after each ACME renewal operation. |
+| /shared/acme/config | A text file containing the client configuration. Multiple provider-specific config files may be created as needed. |
+| /shared/acme/config_reporting | A text file containing the smtp reporting configuration. |
+| /shared/acme/dehydrated | The ACME (dehydrated) client script. |
+| /shared/acme/f5acmehandler.sh | The ACME client wrapper utility script. This is the script that gets scheduled, and handles all renewal processing. |
+| /shared/acme/f5hook.sh | The ACME client hook script. This script is called by the ACME client to handle deploy challenge and clean challenge actions. |
+| acme_handler_rule | BIG-IP iRule applied to port 80/HTTP VIPs for each application, responsible for handling the ACMEv2 challenge. |
+| dg_acme_challenge | BIG-IP data group used for ephemeral storage of ACMEv2 challenge tokens. |
+| dg_acme_config | BIG-IP data group used to manage the global configuration. |
+| f5_acme_account_state | BIG-IP iFile object used in HA environments to maintain account registration state between BIG-IP peers. |
+| f5_acme_config_state | BIG-IP iFile object used in HA environments to maintain per-domain configuration state(s) between BIG-IP peers. |
 
 The ```install.sh``` script is called from a Bash shell on the BIG-IP to:
 
