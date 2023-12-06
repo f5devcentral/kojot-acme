@@ -1,6 +1,6 @@
 ## F5 BIG-IP ACME Client (Dehydrated) Configuration File
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231013-1
+## Version: 20231206-1
 ## Description: Contains per-provider ACME client configuration settings
 
 
@@ -31,6 +31,13 @@ OCSP_MUST_STAPLE="yes"
 
 ## Threshold in days when a certificate must be renewed (default: 30 days)
 THRESHOLD=30
+
+## Option to force HA sync on certificate updates. When disabled, change data is stored to iFile object and requires an auto sync to ensure
+## consistency. When this option is enabled, an HA sync is triggered when there is an update to any of the certificates. (default: false)
+FORCE_SYNC=false
+
+## When FORCE_SYNC is true, you must also specify the BIG-IP Device Group name.
+DEVICE_GROUP=mydevicegroup
 
 ## Set to true to always generate a private key. Otherwise a CSR is created from an existing key to support HSM/FIPS environments (default: false)
 ALWAYS_GENERATE_KEY=false
