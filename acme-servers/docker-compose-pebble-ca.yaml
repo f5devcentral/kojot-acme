@@ -105,8 +105,8 @@ services:
 
         ## Insert local hosts DNS entries (if needed for internal testing)
         echo "172.16.1.151   foo.f5labs.com" >> /etc/hosts
-        echo "172.16.1.151   bar.f5labs.com" >> /etc/hosts
-        echo "172.16.1.151   www.f5labs.com" >> /etc/hosts
+        echo "172.16.1.152   bar.f5labs.com" >> /etc/hosts
+        echo "172.16.1.153   www.f5labs.com" >> /etc/hosts
 
         ## Start Pebble Acme server
         pebble -config /configs/config.json -strict
