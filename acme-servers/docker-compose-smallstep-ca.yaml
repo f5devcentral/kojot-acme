@@ -114,11 +114,6 @@ services:
         ## Insert local hosts DNS entries (if needed for internal testing)
         echo "172.16.1.151   foo.f5labs.com" >> /etc/hosts
         echo "172.16.1.151   bar.f5labs.com" >> /etc/hosts
-        echo "172.16.1.151   test.f5labs.com" >> /etc/hosts
-        echo "172.16.1.151   test1.f5labs.com" >> /etc/hosts
-        echo "172.16.1.151   test2.f5labs.com" >> /etc/hosts
-        echo "172.16.1.151   test3.f5labs.com" >> /etc/hosts
-        echo "172.16.1.151   test4.f5labs.com" >> /etc/hosts
         echo "172.16.1.151   www.f5labs.com" >> /etc/hosts
 
         ## Start step-ca server
