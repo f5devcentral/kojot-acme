@@ -14,7 +14,7 @@
 
 ## Set download paths
 acmeclient_url="https://raw.githubusercontent.com/dehydrated-io/dehydrated/master"
-f5acmehandler_url="https://raw.githubusercontent.com/kevingstewart/simple-dehydrated-acme/main"
+f5acmehandler_url="https://raw.githubusercontent.com/f5devcentral/kojot-acme/main"
 
 ## Function: process_install --> installs all needed components
 process_install() {
@@ -42,14 +42,14 @@ process_install() {
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/config -o /shared/acme/config
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/config -o /shared/acme/config_reporting
+        curl -ks -x "${PROXY}" ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
     else
         ## Download and place files
         curl -ks ${acmeclient_url}/dehydrated -o /shared/acme/dehydrated && chmod +x /shared/acme/dehydrated
         curl -ks ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
         curl -ks ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
         curl -ks ${f5acmehandler_url}/config -o /shared/acme/config
-        curl -ks ${f5acmehandler_url}/config -o /shared/acme/config_reporting
+        curl -ks ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
     fi
 
     exit 0
