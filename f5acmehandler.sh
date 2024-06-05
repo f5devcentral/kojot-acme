@@ -329,7 +329,7 @@ process_handler_config () {
          date_cert=$(tmsh list sys crypto cert ${DOMAIN} | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
          date_cert=$(date -d "$date_cert" "+%Y%m%d")
          date_today=$(date +"%Y%m%d")
-         date_test=$(date --date=@$(($date_cert - $date_today)) +'%d')
+         date_test=$(( ($(date -d "$date_cert" +%s) - $(date -d "$date_today" +%s)) / 86400 ))
          process_errors "DEBUG (handler: dates)\n   date_cert=$date_cert\n   date_today=$date_today\n   date_test=$date_test\n"
       else
          date_test=10000
@@ -337,9 +337,9 @@ process_handler_config () {
       fi
 
       ## If certificate is past the threshold window, initiate renewal
-      if [ $THRESHOLD -le $date_test ]
+      if [ $THRESHOLD -ge $date_test ]
       then
-         process_errors "DEBUG (handler: threshold) THRESHOLD ($THRESHOLD) -le date_test ($date_test) - Starting renewal process for ${DOMAIN}\n"
+         process_errors "DEBUG (handler: threshold) THRESHOLD ($THRESHOLD) -ge date_test ($date_test) - Starting renewal process for ${DOMAIN}\n"
          HASCHANGED="true"
          generate_cert_from_csr "$DOMAIN" "$COMMAND"
       else
