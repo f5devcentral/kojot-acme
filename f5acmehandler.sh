@@ -339,7 +339,7 @@ process_handler_config () {
       ## If certificate is past the threshold window, initiate renewal
       if [ $THRESHOLD -ge $date_test ]
       then
-         process_errors "DEBUG (handler: threshold) THRESHOLD ($THRESHOLD) -le date_test ($date_test) - Starting renewal process for ${DOMAIN}\n"
+         process_errors "DEBUG (handler: threshold) THRESHOLD ($THRESHOLD) -ge date_test ($date_test) - Starting renewal process for ${DOMAIN}\n"
          HASCHANGED="true"
          generate_cert_from_csr "$DOMAIN" "$COMMAND"
       else
