@@ -176,7 +176,7 @@ generate_cert_from_csr() {
    process_errors "DEBUG (handler function: generate_cert_from_csr)\n   DOMAIN=${DOMAIN}\n   COMMAND=${COMMAND}\n"
 
    ## Fetch existing subject-alternative-name (SAN) values from the certificate
-   certsan=$(tmsh list sys crypto cert ${DOMAIN} | grep subject-alternative-name | awk '{$1=$1}1' | sed 's/subject-alternative-name //')
+   certsan=$(tmsh list sys crypto cert ${DOMAIN} | grep subject-alternative-name | awk '{$1=$1}1' | sed 's/subject-alternative-name//' | sed 's/IP Address:/IP:/')
    ## If certsan is empty, assign the domain/CN value
    if [ -z "$certsan" ]
    then
