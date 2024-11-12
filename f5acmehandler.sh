@@ -332,7 +332,7 @@ process_handler_config () {
          date_test=$(( ($(date -d "$date_cert" +%s) - $(date -d "$date_today" +%s)) / 86400 ))
          process_errors "DEBUG (handler: dates)\n   date_cert=$date_cert\n   date_today=$date_today\n   date_test=$date_test\n"
       else
-         date_test=10000
+         date_test=0
          process_errors "DEBUG (handler: dates)\n   --force argument specified, forcing renewal\n"
       fi
 
