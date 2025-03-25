@@ -11,9 +11,10 @@
 
 # Extra options passed to the curl binary (default: <unset>)
 # Common options:
-#   --http1.1          = use HTTP/1.1
-#   -k                 = ignore certificate errors
-#   -x <proxy-url>     = use an explicit proxy
+#   --http1.1                = use HTTP/1.1
+#   -k                       = ignore certificate errors
+#   -x <proxy-url>           = use an explicit proxy
+#   --connect-timeout <sec>  = use this option if some ACME services can take longer than normal to respond
 # Ex. CURL_OPTS="--http1.1 -k -x 10.1.10.150:3128"
 CURL_OPTS="--http1.1 -k"
 
