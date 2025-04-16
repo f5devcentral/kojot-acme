@@ -19,7 +19,7 @@ f5acmehandler_url="https://raw.githubusercontent.com/f5devcentral/kojot-acme/mai
 ## Function: process_install --> installs all needed components
 process_install() {
     ## create working directory
-    mkdir -p /shared/acme
+    mkdir -p /shared/acme/domains
 
     ## Create BIG-IP data groups (dg_acme_challenge, dg_acme_config)
     tmsh create ltm data-group internal dg_acme_challenge type string > /dev/null 2>&1

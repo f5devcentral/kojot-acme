@@ -63,11 +63,13 @@ deploy_cert() {
     ## Import new cert and key
     local DOMAIN="${1}" KEYFILE="${2}" CERTFILE="${3}" FULLCHAINFILE="${4}" CHAINFILE="${5}" TIMESTAMP="${6}"
     process_errors "DEBUG (hook function: deploy_cert)\n   DOMAIN=${DOMAIN}\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n   TIMESTAMP=${TIMESTAMP}\n"
-        
+
+    # ALIAS is a directory name
+    ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $5 }')"
 
     ## Test if cert and key exist
-    key=true && [[ "$(tmsh list sys file ssl-key ${DOMAIN} 2>&1)" =~ "was not found" ]] && key=false
-    cert=true && [[ "$(tmsh list sys file ssl-cert ${DOMAIN} 2>&1)" =~ "was not found" ]] && cert=false
+    key=true && [[ "$(tmsh list sys file ssl-key ${ALIAS} 2>&1)" =~ "was not found" ]] && key=false
+    cert=true && [[ "$(tmsh list sys file ssl-cert ${ALIAS} 2>&1)" =~ "was not found" ]] && cert=false
 
     if ($key && $cert)
     then
@@ -77,8 +79,8 @@ deploy_cert() {
             process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
-            echo install sys crypto key ${DOMAIN} from-local-file ${ACMEDIR}/certs/${DOMAIN}/privkey.pem
-            echo install sys crypto cert ${DOMAIN} from-local-file ${ACMEDIR}/certs/${DOMAIN}/fullchain.pem
+            echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
+            echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem
             echo submit cli transaction
             ) | tmsh
         else
@@ -86,8 +88,8 @@ deploy_cert() {
             process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
-            echo install sys crypto key ${DOMAIN} from-local-file ${ACMEDIR}/certs/${DOMAIN}/privkey.pem
-            echo install sys crypto cert ${DOMAIN} from-local-file ${ACMEDIR}/certs/${DOMAIN}/cert.pem
+            echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
+            echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem
             echo submit cli transaction
             ) | tmsh
         fi
@@ -97,32 +99,32 @@ deploy_cert() {
             ## Create cert and key
             process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
-            tmsh install sys crypto key ${DOMAIN} from-local-file ${ACMEDIR}/certs/${DOMAIN}/privkey.pem
-            tmsh install sys crypto cert ${DOMAIN} from-local-file ${ACMEDIR}/certs/${DOMAIN}/fullchain.pem
+            tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
+            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem
         else
             process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
-            tmsh install sys crypto key ${DOMAIN} from-local-file ${ACMEDIR}/certs/${DOMAIN}/privkey.pem
-            tmsh install sys crypto cert ${DOMAIN} from-local-file ${ACMEDIR}/certs/${DOMAIN}/cert.pem
+            tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
+            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem
         fi
     fi
 
     ## Clean up and zeroize local storage (via shred)
-    cd ${ACMEDIR}/certs/${DOMAIN}
+    cd ${ACMEDIR}/certs/${ALIAS}
     find . -type f -print0 | xargs -0 shred -fuz -n ${ZEROCYCLE}
     cd ${ACMEDIR}/
-    rm -rf ${ACMEDIR}/certs/${DOMAIN}/
+    rm -rf ${ACMEDIR}/certs/${ALIAS}/
 
 
     ## Test if corresponding clientssl profile exists
     if ($CREATEPROFILE)
     then
-        clientssl=true && [[ "$(tmsh list ltm profile client-ssl "${DOMAIN}_clientssl" 2>&1)" =~ "was not found" ]] && clientssl=false
+        clientssl=true && [[ "$(tmsh list ltm profile client-ssl "${ALIAS}_clientssl" 2>&1)" =~ "was not found" ]] && clientssl=false
 
         if [[ $clientssl == "false" ]]
         then
             ## Create the clientssl profile
-            tmsh create ltm profile client-ssl "${DOMAIN}_clientssl" cert-key-chain replace-all-with { ${DOMAIN} { key ${DOMAIN} cert ${DOMAIN} } } 
+            tmsh create ltm profile client-ssl "${ALIAS}_clientssl" cert-key-chain replace-all-with { ${ALIAS} { key ${ALIAS} cert ${ALIAS} } }
         fi
     fi
 }

@@ -7,6 +7,7 @@ This project defines a set of utility functions for the [Dehydrated](https://git
 * Simple installation, configuration, and scheduling
 * Supports renewal with existing private keys to enable certificate automation in HSM/FIPS environments
 * Supports per-domain configurations, and multiple ACME providers
+* Supports wildcard certificate creation and renewal
 * Supports OCSP and periodic revocation testing
 * Supports External Account Binding (EAB)
 * Supports SAN certificate renewal
@@ -47,6 +48,7 @@ Installation to the BIG-IP is simple. The only constraint is that the certificat
     www.foo.com := --ca https://acme-v02.api.letsencrypt.org/directory
     www.bar.com := --ca https://acme.zerossl.com/v2/DV90 --config /shared/acme/config_www_example_com
     www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa
+    *.baz.com   := --ca https://acme.locallab.com:9000/directory --alias star_baz_com
     ```
 
 * ${\normalsize{\textbf{\color{red}Step\ 3}}}$ (Client Configuration): Adjust the client configuration ```config``` file in the /shared/acme folder as needed for your environment. In most cases you will only need a single client config file, but this utility allows for per-domain client configurations. For example, you can define separate config files when EAB is needed for some provider(s), but not others. In an HA environment, the utility ensures these config files are available to the peer. See the **ACME Client Configuration Options** section below for additional details.
@@ -90,6 +92,7 @@ Global configuration options are specified in the ```dg_acme_config``` data grou
 |-------------------|---------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
 | --ca              | Defines the ACME provider URL                                                                                             | --ca https://acme-v02.api.letsencrypt.org/directory (Let's Encrypt)<br /> --ca https://acme-staging-v02.api.letsencrypt.org/directory (LE Staging)<br /> --ca https://acme.zerossl.com/v2/DV90 (ZeroSSL)<br /> --ca https://api.buypass.com/acme/directory (Buypass)<br /> --ca https://api.test4.buypass.no/acme/directory (Buypass Test)<br /> | $${\normalsize{\textbf{\color{red}Yes}}}$$  |
 | --config          | Defines an alternate config file (default: /shared/acme/config)                                                           | --config /shared/acme/config_www_foo_com                                                                                                                                                                                                                                                                                                         | $${\normalsize{\textbf{\color{black}No}}}$$ |
+| --alias           | Specify an alias to be used to reference the certificate intead of a doamin name.  Used to support wildcard certificate management.                                                           | --alias star_example_com
 | -a                | Overrides the required leaf certificate algorithm specified in the config file. (default: rsa)                            | -a rsa<br /> -a prime256v1<br /> -a secp384r1<br />                                                                                                                                                                                                                                                                                              | $${\normalsize{\textbf{\color{black}No}}}$$ |
 | -d                | Includes additional DNS subject-alternative-name (SAN) values in the certificate. This option can be used multiple times. | -d foo.example.com -d bar.example.com                                                                                                                                                                                                                                                                                                            | $${\normalsize{\textbf{\color{black}No}}}$$ |   
 
@@ -102,11 +105,13 @@ www.foo.com := --ca https://acme-v02.api.letsencrypt.org/directory
 www.bar.com := --ca https://acme.zerossl.com/v2/DV90 --config /shared/acme/config_www_example_com
 www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa
 www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa -d foo.baz.com -d bar.baz.com
+*.baz.com   := --ca https://acme.locallab.com:9000/directory --alias star_baz_com
 ```
 
 ***Note the following:***
 * *In using the -d option to include additional SAN values, ACME providers will typically also require validation of these hostnames as well. Ensure that DNS for each of these also resolve to an IP address on the BIG-IP that can answer the ACME challenge.*
 * *The -d option only applies to new certificates. Once a certificate has been created, the ACME renewal will retain the SAN values in the existing certificate.*
+* *The --alias option abstracts the domain name into an alias used internally on the BIG-IP.  The alias is used instead of a domain name within SSL profiles. The alias prevents shell globbing collisions within the BIG-IP for wildcard certificates.  Do not use an asterisk in the alias.*
 <br />
 </details>
 
@@ -454,6 +459,26 @@ curl -s https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/uninstall
 ***Note** that the dg_acme_challenge data group, and acme_handler_rule iRule are not deleted in the uninstall script, as they are referenced outside of the ```f5acmehandler.sh``` utility.*
 
 <br />
+
+</details>
+
+<details>
+<summary><b>Wildcard Certificate Requests with Subject Alternate Names</b></summary>
+
+Wildcard certificates can now be created and managed with kojot-acme using aliases.
+
+For example, to tell the F5 to use example_com_acme as a alias for example.com, the following is configured in `dg_acme_config`:
+| **Key** | **Value**                                                                                                                                                                                                                                       |
+|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| String | example.com |
+| Value | --ca https://acme.zerossl.com/v2/DV90 --alias example_com_acme --domains-txt /shared/acme/domains/example.com.domains.txt|
+
+The file `example.com.domains.txt` specifiies the Subject Alternate Names for the certificate.  For example:
+```
+example.com *.example.com www.example.com > example_com_acme
+```
+
+`example.com \*.example.com www.example.com` is the SAN definition followed by `> example_com_acme` which defines the alias to use within the F5.  This alias must be the same alias as used in the `--alias` command line parameter from the `dg_acme_config` definition.
 
 </details>
 
