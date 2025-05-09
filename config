@@ -1,20 +1,19 @@
-## F5 BIG-IP ACME Client (Dehydrated) Configuration File
+## F5 BIG-IP ACME Client Provider Configuration File
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231206-1
+## Version: 20250509-1
 ## Description: Contains per-provider ACME client configuration settings
 
 
 
 ########################################################
-## COMMON SETTINGS #####################################
+## PROVIDER COMMON SETTINGS ############################
 ########################################################
 
 # Extra options passed to the curl binary (default: <unset>)
 # Common options:
-#   --http1.1                = use HTTP/1.1
-#   -k                       = ignore certificate errors
-#   -x <proxy-url>           = use an explicit proxy
-#   --connect-timeout <sec>  = use this option if some ACME services can take longer than normal to respond
+#   --http1.1          = use HTTP/1.1
+#   -k                 = ignore certificate errors
+#   -x <proxy-url>     = use an explicit proxy
 # Ex. CURL_OPTS="--http1.1 -k -x 10.1.10.150:3128"
 CURL_OPTS="--http1.1 -k"
 
@@ -33,6 +32,18 @@ OCSP_MUST_STAPLE="yes"
 ## Threshold in days when a certificate must be renewed (default: 30 days)
 THRESHOLD=30
 
+## Option to select the ACMEv2 methods: http-01 (default) or dns-01
+ACME_METHOD="http-01"
+## ACME_METHOD="dns-01"
+
+## DNS-01 option to perform ACMEv2 dns-01 in 2-phases manually (no API) -- requires an interactive shell to use this feature
+## Phase1: Manually deploy the TXT records to the DNS service
+## Phase2: Manually delete the TXT record
+DNS_2_PHASE=false
+
+## DNS-01 option to add delay (in second) between deploy and clean challenge functions
+DNS_DELAY=10
+
 ## Option to force HA sync on certificate updates. When disabled, change data is stored to iFile object and requires an auto sync to ensure
 ## consistency. When this option is enabled, an HA sync is triggered when there is an update to any of the certificates. (default: false)
 FORCE_SYNC=false
@@ -41,7 +52,7 @@ FORCE_SYNC=false
 DEVICE_GROUP=mydevicegroup
 
 ## Set to true to always generate a private key. Otherwise a CSR is created from an existing key to support HSM/FIPS environments (default: false)
-ALWAYS_GENERATE_KEY=false
+ALWAYS_GENERATE_KEY=true
 
 ## Set to true to attempt OCSP revocation check on existing certificates (default: false)
 CHECK_REVOCATION=false
@@ -52,10 +63,58 @@ ERRORLOG=true
 ## Set to true to generate debug logging (default: false)
 DEBUGLOG=true
 
+## Set to a Syslog facility and severity level if Syslog is required for log events (ex. local0.err). Leave empty to disable Syslog.
+SYSLOG="local0.err"
+
 
 
 ########################################################
-## ADVANCED SETTINGS ###################################
+## DNS-01 PROVIDER SETTINGS ############################
+########################################################
+## Options required for DNS API -- uses dnsapi scripts
+## - Add the necessary script to the local folder (ex. /shared/acme/dnsapi)
+## - Update the DNSAPI variable below with the name of the script (without .sh)
+## - Include any other required variables
+## Included scripts are gratuitously borrowed from acme.sh and modified for local use: https://github.com/acmesh-official/acme.sh/wiki/dnsapi
+## ========================================================
+## dns_nsupdate (bind/rfc2136)
+## DNSAPI=dns_nsupdate
+## NSUPDATE_SERVER="192.168.100.53"
+## NSUPDATE_SERVER_PORT=53
+## NSUPDATE_KEY="/shared/acme/extra/dns_nsupdate_creds.ini"
+## ========================================================
+## dns_lua (LuaDNS)
+## DNSAPI=dns_lua
+## LUA_Key='37afffe3fd091a2e8bede63add5583dc'
+## LUA_Email="kevin.g.stewart@gmail.com"
+## ========================================================
+## dns_dynu (Dynu DNS)
+## DNSAPI=dns_dynu
+## Dynu_ClientId=f99887ee-c22f-45ee-a7a1-29b9ff98cefc
+## Dynu_Secret=6564bV4d62U6Tb456XVY53TUU273WW
+## ========================================================
+## dns_dnsimple
+## DNSAPI=dns_dnsimple
+## DNSimple_OAUTH_TOKEN=dnsimple_o_jqOS5Ko3VLYi9jQv29Cd3FBuViyL9JOB
+## ========================================================
+## dns_duckdns
+## DNSAPI=dns_duckdns
+## DuckDNS_Token=09e2b497-fd93-4486-b3eb-28264ea658d0
+## ========================================================
+## dns_pointhq
+## DNSAPI=dns_pointhq
+## PointHQ_Key=59cd9dbc-909e-be80-ee7f-301a9a7bf44f
+## PointHQ_Email=kevin.g.stewart@gmail.com
+## ========================================================
+## dns_desec
+## DNSAPI=dns_desec
+## DESEC_TOKEN=4b3Y22mhVTu19Qv3ZTtBRGN4xzW2
+## ========================================================
+
+
+
+########################################################
+## ADVANCED PROVIDER SETTINGS ##########################
 ########################################################
 
 # Minimum days before expiration to automatically renew certificate (default: 30)
