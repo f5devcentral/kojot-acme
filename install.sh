@@ -2,7 +2,7 @@
 
 ## Simple Dehydrated Acme (F5 BIG-IP) - Install Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231026-1
+## Version: 20250509-1
 ## Description: Wrapper for Dehydrated Acme client to simplify usage on F5 BIG-IP
 ##
 ## Usage:
@@ -12,14 +12,14 @@
 ##            curl -ks -x 172.16.1.144:3128 https://<this-repo-url>/install.sh | bash -s -- --proxy 172.16.1.144:3128
 
 
-## Set download paths
-acmeclient_url="https://raw.githubusercontent.com/dehydrated-io/dehydrated/master"
+## Set download path
 f5acmehandler_url="https://raw.githubusercontent.com/f5devcentral/kojot-acme/main"
 
 ## Function: process_install --> installs all needed components
 process_install() {
-    ## create working directory
-    mkdir -p /shared/acme
+    ## create working directories
+    mkdir -p /shared/acme/bin
+    mkdir -p /shared/acme/dnsapi
 
     ## Create BIG-IP data groups (dg_acme_challenge, dg_acme_config)
     tmsh create ltm data-group internal dg_acme_challenge type string > /dev/null 2>&1
@@ -38,19 +38,22 @@ process_install() {
     if [[ ! "${PROXY}" == "no" ]]
     then
         ## Download and place files
-        curl -ks -x "${PROXY}" ${acmeclient_url}/dehydrated -o /shared/acme/dehydrated && chmod +x /shared/acme/dehydrated
+        curl -ks -x "${PROXY}" ${f5acmehandler_url}/bin/dehydrated -o /shared/acme/bin/dehydrated && chmod +x /shared/acme/bin/dehydrated
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/config -o /shared/acme/config
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
+        curl -ks -x "${PROXY}" ${f5acmehandler_url}/config -o /shared/acme/config_reporting
     else
         ## Download and place files
-        curl -ks ${acmeclient_url}/dehydrated -o /shared/acme/dehydrated && chmod +x /shared/acme/dehydrated
+        curl -ks ${f5acmehandler_url}/bin/dehydrated -o /shared/acme/bin/dehydrated && chmod +x /shared/acme/bin/dehydrated
         curl -ks ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
         curl -ks ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
         curl -ks ${f5acmehandler_url}/config -o /shared/acme/config
-        curl -ks ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
+        curl -ks ${f5acmehandler_url}/config -o /shared/acme/config_reporting
     fi
+
+    ## Delete dehydrated if it exists in the root path (upgrade)
+    rm -f /shared/acme/dehydrated
 
     exit 0
 }
