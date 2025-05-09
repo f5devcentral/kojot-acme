@@ -2,7 +2,7 @@
 
 ## Simple Dehydrated Acme (F5 BIG-IP) - Uninstall Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231013-1
+## Version: 20250509-1
 ## Description: Uninstall wrapper for Dehydrated Acme client and all components
 ##
 ## Usage:
@@ -20,6 +20,7 @@ tmsh delete ltm data-group internal dg_acme_config > /dev/null 2>&1
 ## Delete iFiles
 tmsh delete sys file ifile f5_acme_account_state > /dev/null 2>&1
 tmsh delete sys file ifile f5_acme_config_state > /dev/null 2>&1
+tmsh delete sys file ifile f5_acme_dnsapi_state > /dev/null 2>&1
 
 
 ## Delete /shared/acme folder and all contents
