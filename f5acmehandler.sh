@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20231206-1
+## Version: 202500509-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -11,7 +11,7 @@
 ##        www.foo.com := --ca https://acme-v02.api.letsencrypt.org/directory
 ##        www.bar.com := --ca https://acme.zerossl.com/v2/DV90 --config /shared/acme/config_www_example_com
 ##        www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa
-##    - Update client config file (/shared/acme/config), and/or create new config files per provider as needed (name must start with "config")
+##    - Update client config file (/shared/acme/config), and/or create new config files per provider as needed (name must start with "config_")
 ##    - Create HTTP VIPs to match corresponding HTTPS VIPs, and attach iRule (acme_handler_rule)
 ##    - Perform an initial fetch: cd /shared/acme && ./f5acmehandler.sh
 ##    - Set a cron-based schedule: cd /shared/acme && ./f5acmehandler.sh --schedule "00 04 * * 1"
@@ -25,47 +25,83 @@
 ## ================================================== ##
 
 ## Static processing variables - do not touch
-ACMEDIR=/shared/acme
-STANDARD_OPTIONS="-x -k ${ACMEDIR}/f5hook.sh -t http-01"
-REGISTER_OPTIONS="--register --accept-terms"
-LOGFILE=/var/log/acmehandler
-FORCERENEW="no"
-SINGLEDOMAIN=""
-VERBOSE="no"
-ACCTSTATEEXISTS="no"
-CONFSTATEEXISTS="no"
-THISCONFIG=""
-SAVECONFIG="no"
-ENABLE_REPORTING=false
-FORCE_SYNC=false
-DEVICE_GROUP=""
-MAILHUB=""
-USESTARTTLS=no
-USETLS=no
-AUTHUSER=""
-AUTHPASS=""
-TLS_CA_FILE=""
-REPORT_FROM=""
-REPORT_TO=""
-REPORT_SUBJECT=""
-FROMLINEOVERRIDE=no
-REPORT=""
-HASCHANGED="false"
+export ACMEDIR=/shared/acme
+#export  STANDARD_OPTIONS="-x -k ${ACMEDIR}/f5hook.sh -t http-01"
+export STANDARD_OPTIONS="-x -k ${ACMEDIR}/f5hook.sh"
+export REGISTER_OPTIONS="--register --accept-terms"
+export LOGFILE=/var/log/acmehandler
+export DGCONFIG="/Common/dg_acme_config"
+export SYSLOG=""
+export FORCERENEW="no"
+export SINGLEDOMAIN=""
+export ACCTSTATEEXISTS="no"
+export CONFSTATEEXISTS="no"
+export THISCONFIG=""
+export SAVECONFIG="no"
+export ENABLE_REPORTING=false
+export FORCE_SYNC=false
+export DEVICE_GROUP=""
+export MAILHUB=""
+export USESTARTTLS=no
+export USETLS=no
+export AUTHUSER=""
+export AUTHPASS=""
+export TLS_CA_FILE=""
+export REPORT_FROM=""
+export REPORT_TO=""
+export REPORT_SUBJECT=""
+export FROMLINEOVERRIDE=no
+export REPORT=""
+export HASCHANGED="false"
+export ALIAS=""
+export SYSLOG=""
+export ACME_METHOD="http-01"
+export ZEROCYCLE=3
+export DNS_DELAY=10
+export DNS_2_PHASE=false
+export INTERACTIVE="false"
+export DEBUGLOG=false
+export ERRORLOG=true
+export CHECK_REVOCATION=false
+export ALWAYS_GENERATE_KEY=false
+export THRESHOLD=30
+export OCSP_MUST_STAPLE="yes"
+export CONTACT_EMAIL=admin@foo.com
+export KEYSIZE="2048"
+export KEY_ALGO=rsa
+export CURL_OPTS="--http1.1 -k"
+export DNSAPI=""
+export RENEW_DAYS="30"
+export OCSP_FETCH="yes"
+export OCSP_DAYS=5
+export FULLCHAIN=true
+export CREATEPROFILE=false
+export WELLKNOWN="/tmp/wellknown"
+
+
+## Send VERBOSE to system variable to allow visibility at hook script
+export VERBOSE="no"
 
 
 ## Function: process_errors --> print error and debug logs to the log file
-process_errors () {
+f5_process_errors() {
    local ERR="${1}"
    timestamp=$(date +%F_%T)
-   if [[ "$ERR" =~ ^"ERROR" && "$ERRORLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
-   if [[ "$ERR" =~ ^"DEBUG" && "$DEBUGLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
-   if [[ "$ERR" =~ ^"PANIC" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
-   if [[ "$VERBOSE" == "yes" ]]; then echo -e ">> [${timestamp}]  ${ERR}"; fi
+   if [[ "$ERR" =~ ^"ERROR" && "$ERRORLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}]  ${ERR}"; fi; fi
+   if [[ "$ERR" =~ ^"DEBUG" && "$DEBUGLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
+   if [[ "$ERR" =~ ^"PANIC" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
+   if [[ "$VERBOSE" == "yes" ]]; then echo -e ">> [${timestamp}]  ${ERR}"; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
+}
+
+
+## Function: process_dehydrated --> call dehydrated ACME client
+f5_process_dehydrated() {
+   ./bin/dehydrated "${@:-}"
 }
 
 
 ## Function: process_report --> generate and send report via SMTP (requires)
-process_report () {
+f5_process_report() {
    local TMPREPORT="${1}"
 
    ## Only process reporting if config_reporting file exists and ENABLE_REPORTING is true
@@ -74,23 +110,20 @@ process_report () {
       . "${ACMEDIR}/config_reporting"
       if [[ "$ENABLE_REPORTING" == "true" ]]
       then
-         # echo -e "From: ${REPORT_FROM}\nSubject: ${REPORT_SUBJECT}\n\n$(echo -e $(cat ${TMPREPORT})\n\n)"
-         echo -e "From: ${REPORT_FROM}\nSubject: ${REPORT_SUBJECT}\n\n$(echo -e $(cat ${TMPREPORT}))" | ssmtp -C "${ACMEDIR}/config_reporting" "${REPORT_TO}"
+         echo -e "From: ${REPORT_FROM}\nSubject: ${REPORT_SUBJECT}\n\n$(echo -e $(cat ${TMPREPORT}))" | /usr/sbin/ssmtp -C "${ACMEDIR}/config_reporting" "${REPORT_TO}"
       fi   
    fi
 }
 
 
 ## Function: process_base64_decode --> performs base64 decode addressing any erroneous padding in input
-process_base64_decode() {
-   # local INPUT="${1}"
-   # echo "$INPUT"==== | fold -w 4 | sed '$ d' | tr -d '\n' | base64 --decode
+f5_process_base64_decode() {
    echo "${1}"==== | fold -w 4 | sed '$ d' | tr -d '\n' | base64 --decode
 }
 
 
 ## Function: process_config_file --> source values from the default or a defined config file
-process_config_file() {
+f5_process_config_file() {
    local COMMAND="${1}"
       
    ## Set default values
@@ -100,6 +133,7 @@ process_config_file() {
    ERRORLOG=true
    DEBUGLOG=false
    CHECK_REVOCATION=false
+   ACME_METHOD="http-01"
 
    ## Extract --config value and read config values
    if [[ "$COMMAND" =~ "--config " ]]; then COMMAND_CONFIG=$(echo "$COMMAND" | sed -E 's/.*(--config+\s[^[:space:]]+).*/\1/g;s/"//g'); else COMMAND_CONFIG=""; fi
@@ -123,7 +157,7 @@ process_config_file() {
       THIS_COMMAND_CONFIG=$(echo ${COMMAND_CONFIG} | sed -E 's/--config //')
       if [[ ! -f "${THIS_COMMAND_CONFIG}" ]]
       then
-         process_errors "PANIC: Specified config file for (${DOMAIN}) does not exist (${THIS_COMMAND_CONFIG})\n"
+         f5_process_errors "PANIC: Specified config file for (${DOMAIN}) does not exist (${THIS_COMMAND_CONFIG})\n"
          echo "    PANIC: Specified config file for (${DOMAIN}) does not exist (${THIS_COMMAND_CONFIG})." >> ${REPORT}
          continue
       else
@@ -148,20 +182,24 @@ process_config_file() {
 ## This function triggers the ACME client directly, which then calls the configured hook script to assist 
 ## in auto-generating a new certificate and private key. The hook script then installs the cert/key if not
 ## present, or updates the existing cert/key via TMSH transaction.
-generate_new_cert_key() {
-   local DOMAIN="${1}" COMMAND="${2}"
-   process_errors "DEBUG (handler function: generate_new_cert_key)\n   DOMAIN=${DOMAIN}\n   COMMAND=${COMMAND}\n"
+f5_generate_new_cert_key() {
+   local DOMAIN="${1}" COMMAND="${2}" ALIAS="${3}"
+   if [[ -z "$ALIAS" ]]; then ALIAS="${DOMAIN}"; fi
+   f5_process_errors "DEBUG (handler function: f5_generate_new_cert_key)\n   DOMAIN=${DOMAIN}\n   COMMAND=${COMMAND}\n   ALIAS=${ALIAS}\n"
 
    ## Trigger ACME client. All BIG-IP certificate management is then handled by the hook script
-   cmd="${ACMEDIR}/dehydrated ${STANDARD_OPTIONS} -c -g -d ${DOMAIN} $(echo ${COMMAND} | tr -d '"')"
-   process_errors "DEBUG (handler: ACME client command):\n$cmd\n"
+   ## --alias is passed to the hook script through ${COMMAND}
+   ##### cmd="${ACMEDIR}/dehydrated ${STANDARD_OPTIONS} -t ${ACME_METHOD} -c -g -d ${DOMAIN} $(echo ${COMMAND} | tr -d '"')"
+   cmd="f5_process_dehydrated ${STANDARD_OPTIONS} -t ${ACME_METHOD} -c -g -d ${DOMAIN} $(echo ${COMMAND} | tr -d '"')"
+   
+   f5_process_errors "DEBUG (handler: ACME client command):\n$cmd\n"
    do=$(REPORT=${REPORT} eval $cmd 2>&1 | cat | sed 's/^/    /')
-   process_errors "DEBUG (handler: ACME client output):\n$do\n"
+   f5_process_errors "DEBUG (handler: ACME client output):\n$do\n"
 
    ## Catch connectivity errors
    if [[ $do =~ "ERROR: Problem connecting to server" ]]
    then
-      process_errors "PANIC: Connectivity error for (${DOMAIN}). Please verify configuration (${COMMAND}).\n\n"
+      f5_process_errors "PANIC: Connectivity error for (${DOMAIN}). Please verify configuration (${COMMAND}).\n\n"
       echo "    PANIC: Connectivity error for (${DOMAIN}). Please verify configuration (${COMMAND})." >> ${REPORT}
       continue
    fi
@@ -171,12 +209,13 @@ generate_new_cert_key() {
 ## Function: (handler) generate_cert_from_csr
 ## This function triggers a CSR creation via TMSH, collects and passes the CSR to the ACME client, then collects
 ## the renewed certificate and replaces the existing certificate via TMSH transaction.
-generate_cert_from_csr() {
-   local DOMAIN="${1}" COMMAND="${2}"
-   process_errors "DEBUG (handler function: generate_cert_from_csr)\n   DOMAIN=${DOMAIN}\n   COMMAND=${COMMAND}\n"
+f5_generate_cert_from_csr() {
+   local DOMAIN="${1}" COMMAND="${2}" ALIAS="${3}"
+   if [[ -z "$ALIAS" ]]; then ALIAS="${DOMAIN}"; fi
+   f5_process_errors "DEBUG (handler function: f5_generate_cert_from_csr)\n   DOMAIN=${DOMAIN}\n   COMMAND=${COMMAND}\n   ALIAS=${ALIAS}\n"
 
    ## Fetch existing subject-alternative-name (SAN) values from the certificate
-   certsan=$(tmsh list sys crypto cert ${DOMAIN} | grep subject-alternative-name | awk '{$1=$1}1' | sed 's/subject-alternative-name//' | sed 's/IP Address:/IP:/')
+   certsan=$(tmsh list sys crypto cert ${ALIAS} | grep subject-alternative-name | awk '{$1=$1}1' | sed 's/subject-alternative-name//' | sed 's/IP Address:/IP:/')
    ## If certsan is empty, assign the domain/CN value
    if [ -z "$certsan" ]
    then
@@ -184,28 +223,30 @@ generate_cert_from_csr() {
    fi
 
    ## Commencing acme renewal process - first delete and recreate a csr for domain (check first to prevent ltm error log message if CSR doesn't exist)
-   csrexists=false && [[ "$(tmsh list sys crypto csr ${DOMAIN} 2>&1)" =~ "${DOMAIN}" ]] && csrexists=true
+   csrexists=false && [[ "$(tmsh list sys crypto csr ${ALIAS} 2>&1)" =~ "${ALIAS}" ]] && csrexists=true
    if ($csrexists)
    then
-      tmsh delete sys crypto csr ${DOMAIN} > /dev/null 2>&1
+      tmsh delete sys crypto csr ${ALIAS} > /dev/null 2>&1
    fi
-   tmsh create sys crypto csr ${DOMAIN} common-name ${DOMAIN} subject-alternative-name "${certsan}" key ${DOMAIN}
+   tmsh create sys crypto csr ${ALIAS} common-name ${DOMAIN} subject-alternative-name "${certsan}" key ${ALIAS}
    
    ## Dump csr to cert.csr in DOMAIN subfolder
-   mkdir -p ${ACMEDIR}/certs/${DOMAIN} 2>&1
-   tmsh list sys crypto csr ${DOMAIN} |sed -n '/-----BEGIN CERTIFICATE REQUEST-----/,/-----END CERTIFICATE REQUEST-----/p' > ${ACMEDIR}/certs/${DOMAIN}/cert.csr
-   process_errors "DEBUG (handler: csr):\n$(cat ${ACMEDIR}/certs/${DOMAIN}/cert.csr | sed 's/^/   /')\n"
+   mkdir -p ${ACMEDIR}/certs/${ALIAS} 2>&1
+   tmsh list sys crypto csr ${ALIAS} |sed -n '/-----BEGIN CERTIFICATE REQUEST-----/,/-----END CERTIFICATE REQUEST-----/p' > ${ACMEDIR}/certs/${ALIAS}/cert.csr
+   f5_process_errors "DEBUG (handler: csr):\n$(cat ${ACMEDIR}/certs/${ALIAS}/cert.csr | sed 's/^/   /')\n"
 
    ## Trigger ACME client and dump renewed cert to certs/{domain}/cert.pem
-   cmd="${ACMEDIR}/dehydrated ${STANDARD_OPTIONS} -s ${ACMEDIR}/certs/${DOMAIN}/cert.csr $(echo ${COMMAND} | tr -d '"')"
-   process_errors "DEBUG (handler: ACME client command):\n   $cmd\n"
+   ##### cmd="${ACMEDIR}/dehydrated ${STANDARD_OPTIONS} -t ${ACME_METHOD} -s ${ACMEDIR}/certs/${ALIAS}/cert.csr $(echo ${COMMAND} | tr -d '"')"
+   cmd="f5_process_dehydrated ${STANDARD_OPTIONS} -t ${ACME_METHOD} -s ${ACMEDIR}/certs/${ALIAS}/cert.csr $(echo ${COMMAND} | tr -d '"')"
+
+   f5_process_errors "DEBUG (handler: ACME client command):\n   $cmd\n"
    do=$(eval $cmd 2>&1 | cat | sed 's/^/    /')
-   process_errors "DEBUG (handler: ACME client output):\n$do\n"
+   f5_process_errors "DEBUG (handler: ACME client output):\n$do\n"
 
    ## Catch connectivity errors
    if [[ $do =~ "ERROR: Problem connecting to server" ]]
    then
-      process_errors "PANIC: Connectivity error for (${DOMAIN}). Please verify configuration (${COMMAND}).\n\n"
+      f5_process_errors "PANIC: Connectivity error for (${DOMAIN}). Please verify configuration (${COMMAND}).\n\n"
       echo "    PANIC: Connectivity error for (${DOMAIN}). Please verify configuration (${COMMAND})." >> ${REPORT}
       continue
    fi
@@ -215,45 +256,46 @@ generate_cert_from_csr() {
    then
       if [[ "${FULLCHAIN}" == "true" ]]
       then
-         cat $do 2>&1 | sed -n '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sed -E 's/^\s+//g' > ${ACMEDIR}/certs/${DOMAIN}/cert.pem
+         cat $do 2>&1 | sed -n '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sed -E 's/^\s+//g' > ${ACMEDIR}/certs/${ALIAS}/cert.pem
       else
-         cat $do 2>&1 | sed -n '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p;/-END CERTIFICATE-/q' | sed -E 's/^\s+//g' > ${ACMEDIR}/certs/${DOMAIN}/cert.pem
+         cat $do 2>&1 | sed -n '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p;/-END CERTIFICATE-/q' | sed -E 's/^\s+//g' > ${ACMEDIR}/certs/${ALIAS}/cert.pem
       fi
    else
-      process_errors "ERROR: ACME client failure: $do\n"
+      f5_process_errors "ERROR: ACME client failure: $do\n"
       return
    fi
 
    ## Create transaction to update existing cert and key
    (echo create cli transaction
-      echo install sys crypto cert ${DOMAIN} from-local-file ${ACMEDIR}/certs/${DOMAIN}/cert.pem
+      echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem
       echo submit cli transaction
    ) | tmsh > /dev/null 2>&1
-   process_errors "DEBUG (handler: tmsh transaction) Installed certificate via tmsh transaction\n"
+   f5_process_errors "DEBUG (handler: tmsh transaction) Installed certificate via tmsh transaction\n"
    echo "    Installed certificate via tmsh transaction." >> ${REPORT}
 
    ## Clean up objects
-   tmsh delete sys crypto csr ${DOMAIN}
-   rm -rf ${ACMEDIR}/certs/${DOMAIN}
-   process_errors "DEBUG (handler: cleanup) Cleaned up CSR and ${DOMAIN} folder\n\n"
+   tmsh delete sys crypto csr ${ALIAS}
+   rm -rf ${ACMEDIR}/certs/${ALIAS}
+   f5_process_errors "DEBUG (handler: cleanup) Cleaned up CSR and ${ALIAS} folder\n\n"
 }
 
 
 ## Function: process_handler_config --> take dg config string as input and perform cert renewal processes
-process_handler_config () {
+f5_process_handler_config() {
 
    ## Split input line into {DOMAIN} and {COMMAND} variables.
    IFS="=" read -r DOMAIN COMMAND <<< $1
+   f5_process_errors "DEBUG START for ($DOMAIN) ==================>\n"
    
    ## Pull values from default or defined config file
-   process_config_file "$COMMAND"
+   f5_process_config_file "$COMMAND"
 
    if [[ ( ! -z "$SINGLEDOMAIN" ) && ( ! "$SINGLEDOMAIN" == "$DOMAIN" ) ]]
    then
       ## Break out of function if SINGLEDOMAIN is specified and this pass is not for the matching domain
       continue
    else
-      process_errors "DEBUG (handler function: process_handler_config)\n   --domain argument specified for ($DOMAIN).\n"
+      f5_process_errors "DEBUG (handler function: f5_process_handler_config)\n   --domain argument specified for ($DOMAIN).\n"
    fi
 
    echo "\n    Processing for domain: ${DOMAIN}" >> ${REPORT}
@@ -264,26 +306,35 @@ process_handler_config () {
    ######################
 
    ## Validation check --> Defined DOMAIN should be syntactically correct
-   dom_regex='^([a-zA-Z0-9](([a-zA-Z0-9-]){0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+   DOMAIN=$(echo "$DOMAIN" | sed 's/\\\*/*/g')
+   dom_regex='^(\*\.)?([a-zA-Z0-9](([a-zA-Z0-9-]){0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
    if [[ ! "$DOMAIN" =~ $dom_regex ]]
    then
-      process_errors "PANIC: Configuration entry ($DOMAIN) is incorrect. Skipping.\n"
+      f5_process_errors "PANIC: Configuration entry ($DOMAIN) is incorrect. Skipping.\n"
       echo "    PANIC: Configuration entry ($DOMAIN) is incorrect. Skipping." >> ${REPORT}
       continue 
+   fi
+
+   ## Validation check: Does the config entry include a "--alias" option
+   if [[ "$COMMAND" =~ "--alias " ]]
+   then
+      ALIAS=$(echo "$COMMAND" | sed -E 's/.*(--alias+\s[^[:space:]]+).*/\1/g;s/"//g;s/--alias //g')
+   else
+      ALIAS="${DOMAIN}"
    fi
 
    ## Validation check: Config entry must include "--ca" option
    if [[ ! "$COMMAND" =~ "--ca " ]]
    then
-      process_errors "PANIC: Configuration entry for ($DOMAIN) must include a \"--ca\" option. Skipping.\n"
+      f5_process_errors "PANIC: Configuration entry for ($DOMAIN) must include a \"--ca\" option. Skipping.\n"
       echo "    PANIC: Configuration entry for ($DOMAIN) must include a \"--ca\" option. Skipping." >> ${REPORT}
       continue 
    fi
 
    ## Validation check: Defined provider should be registered
-   if [[ "$(process_check_registered $COMMAND)" == "notfound" ]]
+   if [[ "$(f5_process_check_registered $COMMAND)" == "notfound" ]]
    then
-      process_errors "DEBUG: Defined ACME provider not registered. Registering.\n"
+      f5_process_errors "DEBUG: Defined ACME provider not registered. Registering.\n"
       echo "    Defined ACME provider not registered. Registering." >> ${REPORT}
 
       ## Extract --ca and --config values
@@ -291,68 +342,116 @@ process_handler_config () {
       if [[ "$COMMAND" =~ "--config " ]]; then COMMAND_CONFIG=$(echo "$COMMAND" | sed -E 's/.*(--config+\s[^[:space:]]+).*/\1/g;s/"//g'); else COMMAND_CONFIG=""; fi
       
       ## Handling registration
-      cmd="${ACMEDIR}/dehydrated --register --accept-terms ${COMMAND_CA} ${COMMAND_CONFIG}"
+      ##### cmd="${ACMEDIR}/dehydrated --register --accept-terms ${COMMAND_CA} ${COMMAND_CONFIG}"
+      cmd="f5_process_dehydrated --register --accept-terms ${COMMAND_CA} ${COMMAND_CONFIG}"
+
       do=$(eval $cmd 2>&1 | cat | sed 's/^/   /')
-      process_errors "DEBUG (handler: ACME provider registration):\n$do\n"
+      f5_process_errors "DEBUG (handler: ACME provider registration):\n$do\n"
    fi
 
 
    ## Start logging
-   process_errors "DEBUG (handler function: process_handler_config)\n   VAR: DOMAIN=${DOMAIN}\n   VAR: COMMAND=${COMMAND}\n"
+   f5_process_errors "DEBUG (handler function: f5_process_handler_config)\n   VAR: DOMAIN=${DOMAIN}\n   VAR: COMMAND=${COMMAND}\n"
 
    ## Error test: check if cert exists in BIG-IP config
-   certexists=true && [[ "$(tmsh list sys crypto cert ${DOMAIN} 2>&1)" == "" ]] && certexists=false
+   certexists=true && [[ "$(tmsh list sys crypto cert ${ALIAS} 2>&1)" == "" ]] && certexists=false
 
-   ## If cert exists or ALWAYS_GENERATE_KEYS is true, call the generate_new_cert_key function
-   if [[ "$certexists" == "false" || "$ALWAYS_GENERATE_KEY" == "true" ]]
+   if [[ "$ALWAYS_GENERATE_KEY" == "true" ]]
    then
-      process_errors "DEBUG: Certificate does not exist, or ALWAYS_GENERATE_KEY is true --> call generate_new_cert_key.\n"
-      echo "    Certificate does not exist, or ALWAYS_GENERATE_KEY is true. Generating a new cert and key." >> ${REPORT}
-      HASCHANGED="true"
-      generate_new_cert_key "$DOMAIN" "$COMMAND"
-   
-   elif [[ "$certexists" == "true" && "$CHECK_REVOCATION" == "true" && "$(process_revocation_check "${DOMAIN}")" == "revoked" ]]
-   then
-      process_errors "DEBUG: Certificate exists, CHECK_REVOCATION is enabled, and revocation check found that (${DOMAIN}) is revoked -- Fetching new certificate and key"
-      echo "    Certificate exists, CHECK_REVOCATION is enabled, and revocation check found that (${DOMAIN}) is revoked -- Fetching new certificate and key." >> ${REPORT}
-      HASCHANGED="true"
-      generate_new_cert_key "$DOMAIN" "$COMMAND"
+      ## If ALWAYS_GENERATE_KEYS is true, call the f5_generate_new_cert_key function, else call f5_generate_cert_from_csr
+      if [[ "$certexists" == "false" ]]
+      then
+         ## Certificate does not exist
+         f5_process_errors "DEBUG: ALWAYS_GENERATE_KEY is true and certificate does not exist --> call f5_generate_new_cert_key.\n"
+         echo "    ALWAYS_GENERATE_KEY is true and certificate does not exist. Generating a new cert and key." >> ${REPORT}
+         HASCHANGED="true"
+         f5_generate_new_cert_key "$DOMAIN" "$COMMAND" "$ALIAS"
+      
+      elif [[ "$certexists" == "true" && "$CHECK_REVOCATION" == "true" && "$(f5_process_revocation_check "${ALIAS}")" == "revoked" ]]
+      then
+         ## Certificate exists, but CHECK_REVOCATION is enabled and certificate is revoked
+         f5_process_errors "DEBUG: ALWAYS_GENERATE_KEY is true, certificate exists, CHECK_REVOCATION is on, and revocation check found (${DOMAIN}) is revoked -- Fetching new certificate and key"
+         echo "    ALWAYS_GENERATE_KEY is true, certificate exists, CHECK_REVOCATION is on, and revocation check found (${DOMAIN}) is revoked -- Fetching new certificate and key." >> ${REPORT}
+         HASCHANGED="true"
+         f5_generate_new_cert_key "$DOMAIN" "$COMMAND" "$ALIAS"
+      
+      else
+         ## Certificate exists and is not expired. Check for FORCERENEW and collect today's date and certificate expiration date
+         if [[ ! "${FORCERENEW}" == "yes" ]]
+         then
+            date_cert=$(tmsh list sys crypto cert ${ALIAS} | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
+            date_cert=$(date -d "$date_cert" "+%Y%m%d")
+            date_today=$(date +"%Y%m%d")
+            date_test=$(( ($(date -d "$date_cert" +%s) - $(date -d "$date_today" +%s)) / 86400 ))
+            f5_process_errors "DEBUG (handler: dates)\n   date_cert=$date_cert\n   date_today=$date_today\n   date_test=$date_test\n"
+         else
+            date_test=0
+            f5_process_errors "DEBUG (handler: dates)\n   --force argument specified, forcing renewal\n"
+         fi
+
+         ## If certificate is past the threshold window, initiate renewal
+         if [ $THRESHOLD -ge $date_test ]
+         then
+            f5_process_errors "DEBUG: ALWAYS_GENERATE_KEY is true, certificate exists, and THRESHOLD ($THRESHOLD) -ge date_test ($date_test) - Starting renewal process for ${DOMAIN}\n"
+            echo "    ALWAYS_GENERATE_KEY is true, certificate exists, and THRESHOLD ($THRESHOLD) -ge date_test ($date_test) - Starting renewal process for ${DOMAIN}" >> ${REPORT}
+            HASCHANGED="true"
+            f5_generate_new_cert_key "$DOMAIN" "$COMMAND" "$ALIAS"
+         else
+            f5_process_errors "DEBUG: ALWAYS_GENERATE_KEY is true, certificate exists, and bypassing renewal process for ${DOMAIN} - Certificate within threshold\n"
+            echo "    ALWAYS_GENERATE_KEY is true, certificate exists, and bypassing renewal process for ${DOMAIN} - Certificate within threshold" >> ${REPORT}
+         fi
+      fi
    
    else
-      ## Else call the generate_cert_from_csr function
-      process_errors "DEBUG: Certificate exists and ALWAYS_GENERATE_KEY is false --> call generate_cert_from_csr.\n"
-      echo "    Certificate exists and ALWAYS_GENERATE_KEY is false --> call generate_cert_from_csr." >> ${REPORT}
-
-      ## Collect today's date and certificate expiration date
-      if [[ ! "${FORCERENEW}" == "yes" ]]
+      ## If ALWAYS_GENERATE_KEYS is false, call the f5_generate_cert_from_csr function
+      if [[ "$certexists" == "false" ]]
       then
-         date_cert=$(tmsh list sys crypto cert ${DOMAIN} | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
-         date_cert=$(date -d "$date_cert" "+%Y%m%d")
-         date_today=$(date +"%Y%m%d")
-         date_test=$(( ($(date -d "$date_cert" +%s) - $(date -d "$date_today" +%s)) / 86400 ))
-         process_errors "DEBUG (handler: dates)\n   date_cert=$date_cert\n   date_today=$date_today\n   date_test=$date_test\n"
-      else
-         date_test=0
-         process_errors "DEBUG (handler: dates)\n   --force argument specified, forcing renewal\n"
-      fi
-
-      ## If certificate is past the threshold window, initiate renewal
-      if [ $THRESHOLD -ge $date_test ]
-      then
-         process_errors "DEBUG (handler: threshold) THRESHOLD ($THRESHOLD) -ge date_test ($date_test) - Starting renewal process for ${DOMAIN}\n"
+         ## Certificate does not exist
+         f5_process_errors "DEBUG: ALWAYS_GENERATE_KEY is false and certificate does not exist --> call f5_generate_cert_from_csr.\n"
+         echo "    ALWAYS_GENERATE_KEY is false and certificate does not exist. Generating a new cert and key." >> ${REPORT}
          HASCHANGED="true"
-         generate_cert_from_csr "$DOMAIN" "$COMMAND"
+         f5_generate_cert_from_csr "$DOMAIN" "$COMMAND" "$ALIAS"
+      
+      elif [[ "$certexists" == "true" && "$CHECK_REVOCATION" == "true" && "$(f5_process_revocation_check "${DOMAIN}")" == "revoked" ]]
+      then
+         ## Certificate exists, but CHECK_REVOCATION is enabled and certificate is revoked
+         f5_process_errors "DEBUG: ALWAYS_GENERATE_KEY is false, certificate exists, CHECK_REVOCATION is on, and revocation check found (${DOMAIN}) is revoked -- Fetching new certificate"
+         echo "    ALWAYS_GENERATE_KEY is false, certificate exists, CHECK_REVOCATION is on, and revocation check found (${DOMAIN}) is revoked -- Fetching new certificate." >> ${REPORT}
+         HASCHANGED="true"
+         f5_generate_cert_from_csr "$DOMAIN" "$COMMAND" "$ALIAS"
+      
       else
-         process_errors "DEBUG (handler: bypass) Bypassing renewal process for ${DOMAIN} - Certificate within threshold.\n"
-         echo "    Bypassing renewal process for ${DOMAIN} - Certificate within threshold." >> ${REPORT}
-         #return
+         ## Certificate exists and is not expired. Check for FORCERENEW and collect today's date and certificate expiration date
+         if [[ ! "${FORCERENEW}" == "yes" ]]
+         then
+            date_cert=$(tmsh list sys crypto cert ${ALIAS} | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
+            date_cert=$(date -d "$date_cert" "+%Y%m%d")
+            date_today=$(date +"%Y%m%d")
+            date_test=$(( ($(date -d "$date_cert" +%s) - $(date -d "$date_today" +%s)) / 86400 ))
+            f5_process_errors "DEBUG (handler: dates)\n   date_cert=$date_cert\n   date_today=$date_today\n   date_test=$date_test\n"
+         else
+            date_test=0
+            f5_process_errors "DEBUG (handler: dates)\n   --force argument specified, forcing renewal\n"
+         fi
+
+         ## If certificate is past the threshold window, initiate renewal
+         if [ $THRESHOLD -ge $date_test ]
+         then
+            f5_process_errors "DEBUG: ALWAYS_GENERATE_KEY is false, certificate exists, and THRESHOLD ($THRESHOLD) -ge date_test ($date_test) - Starting renewal process for ${DOMAIN}\n"
+            echo "    ALWAYS_GENERATE_KEY is false, certificate exists, and THRESHOLD ($THRESHOLD) -ge date_test ($date_test) - Starting renewal process for ${DOMAIN}" >> ${REPORT}
+            HASCHANGED="true"
+            f5_generate_cert_from_csr "$DOMAIN" "$COMMAND" "$ALIAS"
+         else
+            f5_process_errors "DEBUG: ALWAYS_GENERATE_KEY is false, certificate exists, and bypassing renewal process for ${DOMAIN} - Certificate within threshold\n"
+            echo "    ALWAYS_GENERATE_KEY is false, certificate exists, and bypassing renewal process for ${DOMAIN} - Certificate within threshold" >> ${REPORT}
+         fi
       fi
    fi
 }
 
 
 ## Function: process_check_registered --> tests for local registration
-process_check_registered() {
+f5_process_check_registered() {
    local INCOMMAND="${1}"
    account=$(echo "$INCOMMAND" | sed -E 's/.*(--ca+\s[^[:space:]]+).*/\1/g;s/"//g;s/--ca //g' | base64 | sed -E 's/=//g')
    if [[ -d "${ACMEDIR}/accounts/${account}" ]]
@@ -365,9 +464,9 @@ process_check_registered() {
 
 
 ## Function: process_get_configs --> pulls configs from iFile central store into local folder
-process_get_configs() {
+f5_process_get_configs() {
    ## Only run this on HA systems
-   ISHA=$(tmsh show cm sync-status | grep Standalone | wc -l)
+   # ISHA=$(tmsh show cm sync-status | grep Standalone | wc -l)
    if [[ "${ISHA}" = "0" ]]
    then
       ## ACCOUNTS STATE DATA 
@@ -377,10 +476,23 @@ process_get_configs() {
       then
          cat $(tmsh list sys file ifile f5_acme_account_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | base64 -d | tar xz
          ACCTSTATEEXISTS="yes"
-         process_errors "DEBUG Pulling acme account state information from iFile central storage\n"
+         f5_process_errors "DEBUG Pulling acme account state information from iFile central storage\n"
       else
          ACCTSTATEEXISTS="no"
-         process_errors "DEBUG No iFile central account store found - New state data will need to be created locally\n"
+         f5_process_errors "DEBUG No iFile central account store found - New state data will need to be created locally\n"
+      fi
+
+      ## DNSAPI STATE DATA 
+      ## Test if the iFile exists (f5_acme_state) and pull into local folder if it does
+      ifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_dnsapi_state 2>&1)" =~ "was not found" ]] && ifileexists=false
+      if ($ifileexists)
+      then
+         cat $(tmsh list sys file ifile f5_acme_dnsapi_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | base64 -d | tar xz
+         DNSAPISTATEEXISTS="yes"
+         f5_process_errors "DEBUG Pulling acme dnsapi state information from iFile central storage\n"
+      else
+         DNSAPISTATEEXISTS="no"
+         f5_process_errors "DEBUG No iFile central dnsapi store found - New state data will need to be created locally\n"
       fi
       
       ## Generate checksum on accounts state file (accounts folder)
@@ -392,13 +504,18 @@ process_get_configs() {
       # CONFSTARTSUM=$(find -type f \( -name "config*" \) -exec md5sum {} \; | sort -k 2 | md5sum | awk -F" " '{print $1}')
       CONFSTARTSUM=$(find "${ACMEDIR}" -type f \( -name "config*" \) -exec md5sum {} \; | sort -k 2 | md5sum | awk -F" " '{print $1}')
 
+      ## Generate checksum on dnsapi state file (dnsapi folder)
+      # STARTSUM=$(find -type f \( -path "./dnsapi/*" -o -name "config*" \) -exec md5sum {} \; | sort -k 2 | md5sum | awk -F" " '{print $1}')
+      # DNSAPISTARTSUM=$(find -type f \( -path "./dnsapi/*" \) -exec md5sum {} \; | sort -k 2 | md5sum | awk -F" " '{print $1}')
+      DNSAPISTARTSUM=$(find "${ACMEDIR}/dnsapi" -type f \( -path "*" \) -exec md5sum {} \; | sort -k 2 | md5sum | awk -F" " '{print $1}')
+
 
       ## CONFIGS STATE DATA 
       ## Process config files only if --save is specified
       if [[ "${SAVECONFIG}" == "yes" ]]
       then
          ## SAVECONFIG enabled - do not get config state from central store
-         process_errors "DEBUG SAVECONFIG enabled - working from local config data\n"
+         f5_process_errors "DEBUG SAVECONFIG enabled - working from local config data\n"
       else
          ## SAVECONFIG not enabled - get the config state from central store
          ## Test if the iFile exists (f5_acme_state) and pull into local folder if it does
@@ -407,10 +524,10 @@ process_get_configs() {
          then
             cat $(tmsh list sys file ifile f5_acme_config_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | base64 -d | tar xz
             CONFSTATEEXISTS="yes"
-            process_errors "DEBUG Pulling acme config state information from iFile central storage\n"
+            f5_process_errors "DEBUG Pulling acme config state information from iFile central storage\n"
          else
             CONFSTATEEXISTS="no"
-            process_errors "DEBUG No iFile central config store found - New state data will need to be created locally\n"
+            f5_process_errors "DEBUG No iFile central config store found - New state data will need to be created locally\n"
          fi
       fi
    fi
@@ -418,7 +535,7 @@ process_get_configs() {
 
 
 ## Function: process_put_configs --> pushes local configs to iFile central store
-process_put_configs() {
+f5_process_put_configs() {
    ## Only run this on HA systems
    if [[ "${ISHA}" = "0" ]]
    then
@@ -432,10 +549,15 @@ process_put_configs() {
       # CONFENDSUM=$(find -type f \( -name "config*" \) -exec md5sum {} \; | sort -k 2 | md5sum | awk -F" " '{print $1}')
       CONFENDSUM=$(find "${ACMEDIR}" -type f \( -name "config*" \) -exec md5sum {} \; | sort -k 2 | md5sum | awk -F" " '{print $1}')
 
+      ## Generate checksum on state files (dnsapi folder)
+      DNSAPIENDSUM=$(find "${ACMEDIR}/dnsapi" -type f \( -path "*" \) -exec md5sum {} \; | sort -k 2 | md5sum | awk -F" " '{print $1}')
+
+
       ## STARTSUM/ENDSUM inequality indicates that changes were made - push state changes to iFile store
+      ## ACCOUNTS STATE DATA
       if [[ "$ACCTSTARTSUM" != "$ACCTENDSUM" || "$ACCTSTATEEXISTS" == "no" ]]
       then
-         process_errors "DEBUG START/END account checksums are different or iFile state is missing - pushing account state data to iFile central store\n"
+         f5_process_errors "DEBUG START/END account checksums are different or iFile state is missing - pushing account state data to iFile central store\n"
 
          ## Update HASCHANGED flag
          HASCHANGED="true"
@@ -458,14 +580,14 @@ process_put_configs() {
             rm -f accounts.b64
          fi 
       else
-         process_errors "DEBUG START/END account checksums detects no changes - not pushing account state data to iFile central store\n"
+         f5_process_errors "DEBUG START/END account checksums detects no changes - not pushing account state data to iFile central store\n"
       fi
 
 
-      ## CONFIGS STATE DATA 
+      ## CONFIGS STATE DATA
       if [[ "$CONFSTARTSUM" != "$CONFENDSUM" || "$CONFSTATEEXISTS" == "no" ]]
       then
-         process_errors "DEBUG START/END config checksums are different or iFile state is missing - pushing config state data to iFile central store\n"
+         f5_process_errors "DEBUG START/END config checksums are different or iFile state is missing - pushing config state data to iFile central store\n"
 
          ## Update HASCHANGED flag
          HASCHANGED="true"
@@ -488,21 +610,51 @@ process_put_configs() {
             rm -f configs.b64
          fi
       else
-         process_errors "DEBUG START/END config checksums detects no changes - not pushing config state data to iFile central store\n"
+         f5_process_errors "DEBUG START/END config checksums detects no changes - not pushing config state data to iFile central store\n"
       fi
 
       if [[ "$HASCHANGED" == "true" && "$FORCE_SYNC" == "true" ]]
       then
          ## The config has changed and FORCE_SYNC is set to true - force an HA sync
-         process_errors "DEBUG START/END config checksums are different and FORCE_SYNC is set to true - forcing an HA sync operation\n"
+         f5_process_errors "DEBUG START/END config checksums are different and FORCE_SYNC is set to true - forcing an HA sync operation\n"
          tmsh run /cm config-sync to-group ${DEVICE_GROUP}
+      fi
+
+
+      ## DNSAPI STATE DATA
+      if [[ "$DNSAPISTARTSUM" != "$DNSAPIENDSUM" || "$DNSAPISTATEEXISTS" == "no" ]]
+      then
+         f5_process_errors "DEBUG START/END dnsapi checksums are different or iFile state is missing - pushing dnsapi state data to iFile central store\n"
+
+         ## Update HASCHANGED flag
+         HASCHANGED="true"
+
+         ## First compress and base64-encode the dnsapi folder and config files
+         # tar -czf - dnsapi/ config* | base64 -w 0 > data.b64
+         cd "${ACMEDIR}"
+         tar -czf - "./dnsapi/" | base64 -w 0 > "${ACMEDIR}/dnsapi.b64"
+
+         ## Test if the iFile exists (f5_acme_dnsapi_state)
+         ifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_dnsapi_state 2>&1)" =~ "was not found" ]] && ifileexists=false
+         if ($ifileexists)
+         then
+            ## iFile exists - update iFile and delete local file
+            tmsh modify sys file ifile f5_acme_dnsapi_state source-path "file://${ACMEDIR}/dnsapi.b64"
+            rm -f dnsapi.b64
+         else
+            ## iFile doesn't exist - create iFile and delete local file
+            tmsh create sys file ifile f5_acme_dnsapi_state source-path "file://${ACMEDIR}/dnsapi.b64"
+            rm -f dnsapi.b64
+         fi 
+      else
+         f5_process_errors "DEBUG START/END dnsapi checksums detects no changes - not pushing dnsapi state data to iFile central store\n"
       fi
    fi
 }
 
 
 ## Function: process_revocation_check --> consume BIG-IP certificate object name as input and attempt to perform a direct OCSP revocation check
-process_revocation_check() {
+f5_process_revocation_check() {
    ## Fetch PEM certificate from BIG-IP, separate into cert and chain, and get OCSP URI
    local INCERT="${1}"
    FULLCHAIN=$(cat $(tmsh list sys file ssl-cert "$INCERT" all-properties -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | sed -n '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p')
@@ -535,19 +687,19 @@ process_revocation_check() {
 
 
 ## Function: process_listaccounts --> loop through the accounts folder and print the encoded and decoded values for each registered account
-process_listaccounts() {
+f5_process_listaccounts() {
    printf "\nThe following ACME providers are registered:\n\n"
    for acct in ${ACMEDIR}/accounts/*
    do
       acct_tmp=$(echo $acct | sed -E 's/.*\/accounts\///')
-      printf "   PROVIDER: $(process_base64_decode $acct_tmp)\n"
+      printf "   PROVIDER: $(f5_process_base64_decode $acct_tmp)\n"
       printf "   LOCATION: ${ACMEDIR}/accounts/$acct_tmp\n\n"
    done
 }
 
 
 ## Function: process_schedule --> accept a cron string value and create a crontab entry for this utility
-process_schedule() {
+f5_process_schedule() {
    local CRON="${1}"
 
    ## Validate cron string - currently does a basic structure check (to refine later...)
@@ -576,14 +728,14 @@ process_schedule() {
 
 
 ## Function: process_uninstall --> uninstall the crontab entry
-process_uninstall() {
+f5_process_uninstall() {
    ## Clear out any existing script entry
    crontab -l |grep -v f5acmehandler | crontab
 }
 
 
 ## Function: process_handler_main --> loop through config data group and pass DOMAIN and COMMAND values to client handlers
-process_handler_main() {
+f5_process_handler_main() {
    ## Test for and only run on active BIG-IP
    ACTIVE=$(tmsh show cm failover-status | grep ACTIVE | wc -l)
    if [[ "${ACTIVE}" = "1" ]]
@@ -591,27 +743,31 @@ process_handler_main() {
       echo "\n  Processing renewals:" >> ${REPORT}
 
       ## Call process_get_configs to retrieve centrally stored iFile state data into the local folder
-      process_get_configs
+      f5_process_get_configs
 
       ## Create wellknown folder
       mkdir -p /tmp/wellknown > /dev/null 2>&1
       
       ## Read from the config data group and loop through keys:values
-      config=true && [[ "$(tmsh list ltm data-group internal dg_acme_config 2>&1)" =~ "was not found" ]] && config=false
+      config=true && [[ "$(tmsh list ltm data-group internal ${DGCONFIG} 2>&1)" =~ "was not found" ]] && config=false
       if ($config)
       then
-         IFS=";" && for v in $(tmsh list ltm data-group internal dg_acme_config one-line | sed -e 's/ltm data-group internal dg_acme_config { records { //;s/ \} type string \}//;s/ { data /=/g;s/ \} /;/g;s/ \}//'); do process_handler_config $v; done
+         IFS=";" && for v in $(tmsh list ltm data-group internal ${DGCONFIG} one-line | sed -e 's/^.* records { //;s/ \} type string \}//;s/ { data /=/g;s/ \} /;/g;s/ \}//'); do f5_process_handler_config $v; done
       else
-         process_errors "PANIC: There was an error accessing the dg_acme_config data group. Please re-install.\n"
-         echo "    PANIC: There was an error accessing the dg_acme_config data group" >> ${REPORT}
+         f5_process_errors "PANIC: There was an error accessing the ${DGCONFIG} data group. Please re-install.\n"
+         echo "    PANIC: There was an error accessing the ${DGCONFIG} data group" >> ${REPORT}
          exit 1
       fi
 
       ## Call process_put_configs to push local state data into central iFile store
-      process_put_configs
+      f5_process_put_configs
 
-      process_report "${REPORT}"
+      f5_process_report "${REPORT}"
       # echo -e "$(cat ${REPORT})"
+   else
+      f5_process_errors "DEBUG START/END The BIG-IP node is not in an ACTIVE state. No renewals processed.\n"
+      echo -e "\nThe BIG-IP node is not in an ACTIVE state. No renewals processed.\n" >> ${LOGFILE}
+      exit 1
    fi
    return 0
 }
@@ -619,7 +775,7 @@ process_handler_main() {
 
 ## Function: command_help --> display help information in stdout
 ## Usage: --help
-command_help() {
+f5_command_help() {
   printf "\nUsage: %s [--help]\n"
   printf "Usage: %s [--force] [--domain <domain>]\n"
   printf "Usage: %s [--listaccounts]\n"
@@ -643,16 +799,20 @@ command_help() {
 
 
 ## Function: main --> process command line arguments
-main() {
+f5_main() {
+   ## Test for interactive shell
+   if [ "`tty`" != "not a tty" ]; then export INTERACTIVE=true; fi
+
+   ## Process commandline
    while (( ${#} )); do
       case "${1}" in
          --help)
-           command_help >&2
+           f5_command_help >&2
            exit 0
            ;;
 
          --listaccounts)
-           process_listaccounts
+           f5_process_listaccounts
            exit 0
            ;;
 
@@ -661,15 +821,15 @@ main() {
            if [[ -z "${1:-}" ]]; then
              printf "\nThe specified command requires an additional parameter. Please see --help:" >&2
              echo >&2
-             command_help >&2
+             f5_command_help >&2
              exit 1
            fi
-           process_schedule "${1}"
+           f5_process_schedule "${1}"
            exit 0
            ;;
 
          --uninstall)
-           process_uninstall
+           f5_process_uninstall
            exit 0
            ;;
 
@@ -678,10 +838,10 @@ main() {
            if [[ -z "${1:-}" ]]; then
              printf "\nThe specified command requires an additional parameter. Please see --help:" >&2
              echo >&2
-             command_help >&2
+             f5_command_help >&2
              exit 1
            fi
-           process_revocation_check "${1}"
+           f5_process_revocation_check "${1}"
            exit 0
            ;;
 
@@ -697,7 +857,7 @@ main() {
 
          --verbose)
            echo "  Command Line Option Specified: --verbose" >> ${REPORT}
-           VERBOSE="yes"
+           export VERBOSE="yes"
            ;;
 
          --domain)
@@ -705,7 +865,7 @@ main() {
            if [[ -z "${1:-}" ]]; then
              printf "\nThe specified command requires additional an parameter. Please see --help:" >&2
              echo >&2
-             command_help >&2
+             f5_command_help >&2
              exit 1
            fi
            echo "  Command Line Option Specified: --domain ${1}" >> ${REPORT}
@@ -713,22 +873,20 @@ main() {
            ;;
 
          *)
-           process_errors "DEBUG (handler function: main)\n   Launching default renew operations\n"
+           f5_process_errors "DEBUG (handler function: main)\n   Launching default renew operations\n"
            ;;
       esac
    shift 1
    done
 
    ## Call main function
-   process_handler_main
+   f5_process_handler_main
 }
-
 
 ## Script entry
 REPORT=$(mktemp)
 echo "ACMEv2 Renewal Report: $(date)\n\n" > ${REPORT}
-main "${@:-}"
-
+f5_main "${@:-}"
 
 
 
