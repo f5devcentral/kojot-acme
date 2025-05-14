@@ -42,7 +42,7 @@ process_install() {
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/config -o /shared/acme/config
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/config -o /shared/acme/config_reporting
+        curl -ks -x "${PROXY}" ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
     else
         ## Download and place files
         curl -ks ${f5acmehandler_url}/bin/dehydrated -o /shared/acme/bin/dehydrated && chmod +x /shared/acme/bin/dehydrated
