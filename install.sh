@@ -49,7 +49,7 @@ process_install() {
         curl -ks ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
         curl -ks ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
         curl -ks ${f5acmehandler_url}/config -o /shared/acme/config
-        curl -ks ${f5acmehandler_url}/config -o /shared/acme/config_reporting
+        curl -ks ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
     fi
 
     ## Delete dehydrated if it exists in the root path (upgrade)
