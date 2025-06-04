@@ -798,6 +798,7 @@ Special thanks to:
 </details>
 <details>
 <summary><b>Minor Updates: 2025 June</b></summary>
+* [Issue 15: Fix for 'OCSP Stapling throws error with LetsEncrypt'](https://github.com/f5devcentral/kojot-acme/issues/15)
 * [Issue 16: Fix for 'When schedule option is selected f5acmehandler.sh generates error and does not start renewal process'](https://github.com/f5devcentral/kojot-acme/issues/16)
 </details>
 
