@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250509-1
+## Version: 20250603-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -25,7 +25,7 @@
 ## ================================================== ##
 
 ## Static processing variables - do not touch
-export ACMEDIR=/shared/acme
+export ACMEDIR="/shared/acme"
 #export  STANDARD_OPTIONS="-x -k ${ACMEDIR}/f5hook.sh -t http-01"
 export STANDARD_OPTIONS="-x -k ${ACMEDIR}/f5hook.sh"
 export REGISTER_OPTIONS="--register --accept-terms"
@@ -80,7 +80,7 @@ export WELLKNOWN="/tmp/wellknown"
 
 
 ## Send VERBOSE to system variable to allow visibility at hook script
-export VERBOSE="no"
+export VERBOSE="yes"
 
 
 ## Function: process_errors --> print error and debug logs to the log file
@@ -90,13 +90,20 @@ f5_process_errors() {
    if [[ "$ERR" =~ ^"ERROR" && "$ERRORLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}]  ${ERR}"; fi; fi
    if [[ "$ERR" =~ ^"DEBUG" && "$DEBUGLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
    if [[ "$ERR" =~ ^"PANIC" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
-   if [[ "$VERBOSE" == "yes" ]]; then echo -e ">> [${timestamp}]  ${ERR}"; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
+   if [[ "$VERBOSE" == "yes" ]]; then echo -e ">> [${timestamp}]  ${ERR}" && echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
 }
 
 
 ## Function: process_dehydrated --> call dehydrated ACME client
 f5_process_dehydrated() {
-   ./bin/dehydrated "${@:-}"
+   # ./bin/dehydrated "${@:-}"
+   # cmd="${@:-}"
+   if [[ ! "${@:-}" =~ "--config " ]]
+   then 
+      ${ACMEDIR}/bin/dehydrated "${@:-}" --config /shared/acme/config
+   else
+      ${ACMEDIR}/bin/dehydrated "${@:-}"
+   fi
 }
 
 
@@ -887,7 +894,6 @@ f5_main() {
 REPORT=$(mktemp)
 echo "ACMEv2 Renewal Report: $(date)\n\n" > ${REPORT}
 f5_main "${@:-}"
-
 
 
 
