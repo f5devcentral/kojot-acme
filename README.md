@@ -27,9 +27,10 @@ Why **Kojot**? Often pronounce "koyot", this is a word for "coyote" that has ori
 <br />
 
 ------------
-<!-- ### ${\textbf{\color{blue}Installation\ and\ Configuration}}$ //--->
 
 $${\LARGE{\color{red}Red}}$$
+
+${\LARGE{\color{red}Red}}$
 
 $${\LARGE{\textnormal{\textbf{\color{blue}Installation\ and\ Configuration}}}}$$
 
