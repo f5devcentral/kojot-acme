@@ -795,11 +795,14 @@ Special thanks to:
 * Adds support for wildcard certificates with --alias flag on certificates configuration (data group entry)
 * Adds support for specifying a certificates config data group in an alternate partition/folder (for AS3 programmability). This is edited directly in the f5acmehandler.sh file in the ```DGCONFIG``` variable.
 * Include several pre-built dnsapi scripts for various DNS providers, in the ```dnsapi``` folder.
+
 </details>
+
 <details>
 <summary><b>Minor Updates: 2025 June</b></summary>
 * [Issue 15: Fix for 'OCSP Stapling throws error with LetsEncrypt'](https://github.com/f5devcentral/kojot-acme/issues/15)
 * [Issue 16: Fix for 'When schedule option is selected f5acmehandler.sh generates error and does not start renewal process'](https://github.com/f5devcentral/kojot-acme/issues/16)
+
 </details>
 
 <br />
