@@ -28,7 +28,15 @@ Why **Kojot**? Often pronounce "koyot", this is a word for "coyote" that has ori
 
 ------------
 
-$\color{lightblue}{\textrm{Red Nimetaga 3 kõige suuremat pilveteenuste pakkujat}}$
+# $\textsf{\color{#f5750e}{f5750e}}$
+
+## $\textsf{\color{#f48522}{f48522}}$
+
+### $\textsf{\color{#326a95}{326a95}}$
+
+#### $\textsf{\color{#18afd3}{18afd3}}$
+
+##### $\textsf{\color{#5ec3d5}{5ec3d5}}$
 
 
 $${\LARGE{\textnormal{\textbf{\color{blue}Installation\ and\ Configuration}}}}$$
