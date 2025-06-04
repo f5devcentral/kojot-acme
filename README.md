@@ -27,20 +27,9 @@ Why **Kojot**? Often pronounce "koyot", this is a word for "coyote" that has ori
 <br />
 
 ------------
+<!-- ### ${\textbf{\color{blue}Installation\ and\ Configuration}}$ --->
 
-# $\textsf{\color{#f5750e}{f5750e}}$
-
-## $\textsf{\color{#f48522}{f48522}}$
-
-### $\textsf{\color{#326a95}{326a95}}$
-
-#### $\textsf{\color{#18afd3}{18afd3}}$
-
-##### $\textsf{\color{#5ec3d5}{5ec3d5}}$
-
-
-$${\LARGE{\textnormal{\textbf{\color{blue}Installation\ and\ Configuration}}}}$$
-
+${\LARGE{\textnormal{\textbf{\color{blue}Installation\ and\ Configuration}}}}$
 
 Installation to the BIG-IP is simple. The only constraint is that the certificate objects installed on the BIG-IP **must** be named after the certificate subject name (unless the --alias flag is used). For example, if the certificate subject name is ```www.foo.com```, then the installed certificate and key must also be named ```www.foo.com```. Certificate automation is predicated on this naming construct. To install the utility functions to the BIG-IP:
 
