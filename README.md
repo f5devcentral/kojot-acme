@@ -29,7 +29,7 @@ Why **Kojot**? Often pronounce "koyot", this is a word for "coyote" that has ori
 ------------
 <!-- ### ${\textbf{\color{blue}Installation\ and\ Configuration}}$ --->
 
-<code style="color : red">text</code>
+<code style="color:#FF0000">text</code>
 
 ${\LARGE{\textnormal{\textbf{\color{blue}Installation\ and\ Configuration}}}}$
 
