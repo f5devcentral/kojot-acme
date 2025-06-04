@@ -27,7 +27,8 @@ KEYSIZE="2048"
 CONTACT_EMAIL=admin@f5labs.com
 
 # Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no)
-OCSP_MUST_STAPLE="yes"
+# Default set to 'no' to accomdate LetsEncrypt: https://letsencrypt.org/2024/12/05/ending-ocsp
+OCSP_MUST_STAPLE="no"
 
 ## Threshold in days when a certificate must be renewed (default: 30 days)
 THRESHOLD=30
