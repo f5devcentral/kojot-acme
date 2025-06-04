@@ -27,7 +27,11 @@ Why **Kojot**? Often pronounce "koyot", this is a word for "coyote" that has ori
 <br />
 
 ------------
-### ${\textbf{\color{blue}Installation\ and\ Configuration}}$
+<!-- ### ${\textbf{\color{blue}Installation\ and\ Configuration}}$ --->
+
+![#f03c15] TEST
+
+$${\color{red}Red}$$
 
 ${\LARGE{\textnormal{\textbf{\color{blue}Installation\ and\ Configuration}}}}$
 
