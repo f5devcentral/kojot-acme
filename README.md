@@ -28,7 +28,7 @@ Why **Kojot**? Often pronounce "koyot", this is a word for "coyote" that has ori
 
 ------------
 
-## $\textcolor{yellow}{This\ is\ a\ Big\ Title}$
+## $\color{yellow}This\ is\ a\ Big\ Title$
 
 
 $${\LARGE{\textnormal{\textbf{\color{blue}Installation\ and\ Configuration}}}}$$
