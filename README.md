@@ -3,6 +3,7 @@
 ### An ACMEv2 client utility function for integration and advanced features on the F5 BIG-IP
 
 *Major Updates May 09, 2025 - See updates section at bottom for changes*
+*Minor Updates June 16, 2025 - See updates section at bottom for changes*
 
 This project defines a set of utility functions for the [Dehydrated](https://github.com/dehydrated-io/dehydrated) ACMEv2 client, supporting direct integration with F5 BIG-IP, and including additional advanced features:
 
@@ -170,7 +171,8 @@ The ```f5acmehandler.sh``` utility script also supports a set of commandline opt
 | --testrevocation [domain]     | Attempt to performs an OCSP revocation check on an existing certificate (domain)
 | --uninstall                   | Deletes the cron scheduling                                                                      |
 | --verbose                     | Dump verbose output to stdout                                                                    |
-| --save                        | Save the local config to HA central store (only for HA)                                          |
+| --local                       | Use the local config folder in an HA environment (instead of iFile)                              |
+| --save                        | Save the local config iFiles in a non-HA environment                                             |
 | --help                        | Shows the help information for above command options                                             |
 </details>
 
@@ -534,10 +536,10 @@ In an HA environment, the ```f5acmehandler.sh``` utility stores state informatio
 | f5_acme_config_state   | Stores the compressed and encoded contents of all "config*" files in /shared/acme                                                                |
 | f5_acme_dnsapi_state   | Stores the compressed and encoded contents of the /shared/acme/dnsapi folder                                                                     |
 
-While account state is always read from and pushed back to iFile (in an HA environment), the ```--save``` command-line option enables the utility script to read from local config files, then pushing all config state up to iFiles on completion. In Standalone environments, account and config state are always stored locally in the /shared/acme folder.
+While account state is always read from and pushed back to iFile (in an HA environment), the ```--local``` command-line option enables the utility script to read from local config files, then pushing all config state up to iFiles on completion. In Standalone environments, account and config state are always stored locally in the /shared/acme folder.
 
 ```
-./f5acmehandler.sh --save
+./f5acmehandler.sh --local
 ```
 
 <br />
@@ -799,10 +801,20 @@ Special thanks to:
 </details>
 
 <details>
-<summary><b>Minor Updates: 2025 June</b></summary>
+<summary><b>Minor Updates: 2025 June 3</b></summary>
 
 * [Issue 15: Fix for 'OCSP Stapling throws error with LetsEncrypt'](https://github.com/f5devcentral/kojot-acme/issues/15)
 * [Issue 16: Fix for 'When schedule option is selected f5acmehandler.sh generates error and does not start renewal process'](https://github.com/f5devcentral/kojot-acme/issues/16)
+
+</details>
+
+<details>
+<summary><b>Minor Updates: 2025 June 16</b></summary>
+
+* [Issue 17: iFiles not created after first run](https://github.com/f5devcentral/kojot-acme/issues/17)
+* [Issue 18: f5acmehandler.sh does not synch when FORCE_SYNC is set to true](https://github.com/f5devcentral/kojot-acme/issues/18)
+* Add support for **--local** command line argument that works from the local folder configuration in an HA environment (replacing previous --save function).
+* Update the **--save** command line argument to force saving the local folder configuration to iFiles in a non-HA environment.
 
 </details>
 
