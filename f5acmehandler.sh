@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250603-1
+## Version: 20250616-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -38,6 +38,7 @@ export ACCTSTATEEXISTS="no"
 export CONFSTATEEXISTS="no"
 export THISCONFIG=""
 export SAVECONFIG="no"
+export LOCALCONFIG="no"
 export ENABLE_REPORTING=false
 export FORCE_SYNC=false
 export DEVICE_GROUP=""
@@ -473,8 +474,8 @@ f5_process_check_registered() {
 ## Function: process_get_configs --> pulls configs from iFile central store into local folder
 f5_process_get_configs() {
    ## Only run this on HA systems
-   # ISHA=$(tmsh show cm sync-status | grep Standalone | wc -l)
-   if [[ "${ISHA}" = "0" ]]
+   ISHA=$(tmsh show cm sync-status | grep Standalone | wc -l)
+   if [[ "${ISHA}" = "0" || "${SAVECONFIG}" == "yes" ]]
    then
       ## ACCOUNTS STATE DATA 
       ## Test if the iFile exists (f5_acme_state) and pull into local folder if it does
@@ -519,12 +520,12 @@ f5_process_get_configs() {
 
       ## CONFIGS STATE DATA 
       ## Process config files only if --save is specified
-      if [[ "${SAVECONFIG}" == "yes" ]]
+      if [[ "${LOCALCONFIG}" == "yes" ]]
       then
-         ## SAVECONFIG enabled - do not get config state from central store
-         f5_process_errors "DEBUG SAVECONFIG enabled - working from local config data\n"
+         ## LOCALCONFIG enabled - do not get config state from central store
+         f5_process_errors "DEBUG LOCALCONFIG enabled - working from local config data\n"
       else
-         ## SAVECONFIG not enabled - get the config state from central store
+         ## LOCALCONFIG not enabled - get the config state from central store
          ## Test if the iFile exists (f5_acme_state) and pull into local folder if it does
          confifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_config_state 2>&1)" =~ "was not found" ]] && confifileexists=false
          if ($confifileexists)
@@ -544,7 +545,7 @@ f5_process_get_configs() {
 ## Function: process_put_configs --> pushes local configs to iFile central store
 f5_process_put_configs() {
    ## Only run this on HA systems
-   if [[ "${ISHA}" = "0" ]]
+   if [[ "${ISHA}" = "0" || "${SAVECONFIG}" == "yes" ]]
    then
       ## ACCOUNTS STATE DATA 
       ## Generate checksum on state files (accounts folder)
@@ -625,6 +626,7 @@ f5_process_put_configs() {
          ## The config has changed and FORCE_SYNC is set to true - force an HA sync
          f5_process_errors "DEBUG START/END config checksums are different and FORCE_SYNC is set to true - forcing an HA sync operation\n"
          tmsh run /cm config-sync to-group ${DEVICE_GROUP}
+         tmsh run /cm config-sync from-group ${DEVICE_GROUP}
       fi
 
 
@@ -789,6 +791,7 @@ f5_command_help() {
   printf "Usage: %s [--schedule <cron>]\n"
   printf "Usage: %s [--testrevocation <domain>]\n"
   printf "Usage: %s [--uninstall]\n"
+  printf "Usage: %s [--local]\n"
   printf "Usage: %s [--save]\n"
   printf "Usage: %s [--verbose]\n\n"
   printf "Default (no arguments): renewal operations\n"
@@ -800,7 +803,8 @@ f5_command_help() {
   printf " --schedule <cron>:\t\tInstall/update the scheduler. See REPO for scheduling instructions\n"
   printf " --testrevocation <domain>:\tAttempt to performs an OCSP revocation check on an existing certificate (domain)\n"
   printf " --uninstall:\t\t\tUninstall the scheduler\n"
-  printf " --save:\t\t\tSave the local config to HA central store (only for HA)\n"
+  printf " --local:\t\t\tForce use of local config in an HA environment\n"
+  printf " --save:\t\t\tForce aave of local config to iFiles in non-HA environment\n"
   printf " --verbose:\t\t\tDump verbose output to stdout\n\n\n"
 }
 
@@ -860,6 +864,11 @@ f5_main() {
          --save)
            echo "  Command Line Option Specified: --save" >> ${REPORT} 
            SAVECONFIG="yes"
+           ;;
+
+         --local)
+           echo "  Command Line Option Specified: --local" >> ${REPORT} 
+           LOCALCONFIG="yes"
            ;;
 
          --verbose)
