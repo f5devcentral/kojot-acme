@@ -4,7 +4,7 @@
 
 *Major Updates May 09, 2025 - See updates section at bottom for changes*
 
-*Minor Updates June 16, 2025 - See updates section at bottom for changes*
+*Minor Updates June 27, 2025 - See updates section at bottom for changes*
 
 This project defines a set of utility functions for the [Dehydrated](https://github.com/dehydrated-io/dehydrated) ACMEv2 client, supporting direct integration with F5 BIG-IP, and including additional advanced features:
 
@@ -816,6 +816,13 @@ Special thanks to:
 * [Issue 18: f5acmehandler.sh does not synch when FORCE_SYNC is set to true](https://github.com/f5devcentral/kojot-acme/issues/18)
 * Add support for **--local** command line argument that works from the local folder configuration in an HA environment (replacing previous --save function).
 * Update the **--save** command line argument to force saving the local folder configuration to iFiles in a non-HA environment.
+
+</details>
+
+<details>
+<summary><b>Minor Updates: 2025 June 27</b></summary>
+
+* Add support for F5 DNS integration for dns-01 validation. See the dns_f5dns.sh script in the dnsapi folder for instructions.
 
 </details>
 
