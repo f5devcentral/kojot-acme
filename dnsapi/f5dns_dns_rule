@@ -1,0 +1,19 @@
+when DNS_REQUEST priority 1 {
+    #_acme-challenge.example.org. 300 IN TXT “gfj9Xq…Rg85nM”
+    if { ([DNS::question type] eq "TXT") && ([DNS::question name] starts_with "_acme-challenge") } {
+
+        ## Get domain info
+        set domain [substr [DNS::question name] 16]
+        set domain [string trimleft $domain "*."]
+        
+        if { [set acme_token [table lookup "acme_domain:${domain}"]] ne "" } {
+            DNS::answer insert "[DNS::question name]. 60 [DNS::question class]  [DNS::question type] ${acme_token}"
+            DNS::return
+        }
+
+        ## Unset variables and return
+        unset acme_token
+        event disable all
+        return
+    }
+}
