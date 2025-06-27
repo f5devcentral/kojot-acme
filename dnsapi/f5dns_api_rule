@@ -1,0 +1,40 @@
+when RULE_INIT {
+    ## TABLETIME: user-defined value to indicate record lifetime in session table (default 30 seconds)
+    set static::TABLETIME 30
+    
+    ## BEARERTOKEN: user-defined shared token for private authentication
+    set static::BEARERTOKEN "2345678987654345678987"
+}
+when CLIENT_ACCEPTED {
+    HTTP2::disable
+}
+when HTTP_REQUEST {
+    set fail 0
+    if { ([HTTP::method] eq "POST") and ([HTTP::uri] starts_with "/records/add") } {
+        if { ([HTTP::header exists Authorization]) and ([findstr [HTTP::header Authorization] "Bearer " 7] eq $static::BEARERTOKEN) } {
+            HTTP::collect [HTTP::payload length]
+        } else {
+            set fail 1
+        }
+    } else {
+        set fail 1
+    }
+    if { $fail } {
+        HTTP::respond 503 -version auto content "Incorrect API Usage" noserver Cache-Control no-store "Connection" "close"
+        return
+    }
+}
+when HTTP_REQUEST_DATA {
+    ## Parse payload
+    set domain "" ; set token ""
+    foreach x [split [HTTP::payload] "&"] {
+        if { $x starts_with "domain=" } { set domain [lindex [split $x "="] 1] }
+        if { $x starts_with "token=" } { set token [lindex [split $x "="] 1] }
+    }
+    if { ($domain eq "") or ($token eq "") } {
+        HTTP::respond 503 -version auto content "Incorrect API Usage" noserver Cache-Control no-store "Connection" "close"
+    } else {
+        table set "acme_domain:${domain}" "${token}" $static::TABLETIME
+        HTTP::respond 200 content "Recorded: domain=$domain:token=$token" noserver Cache-Control no-store "Connection" "close"
+    }
+}
