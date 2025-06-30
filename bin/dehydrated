@@ -644,7 +644,7 @@ init_system() {
 
     account_key_info="$(printf '{"e":"%s","kty":"RSA","n":"%s"}' "${pubExponent64}" "${pubMod64}")"
     account_key_sigalgo=RS256
-  elif ("${OPENSSL}" ec -in "${ACCOUNT_KEY}" -check 2>/dev/null > /dev/null); then
+  elif ("${OPENSSL}" ec -in "${ACCOUNT_KEY}" 2>/dev/null > /dev/null); then
     curve="$("${OPENSSL}" ec -in "${ACCOUNT_KEY}" -noout -text 2>/dev/null | grep 'NIST CURVE' | cut -d':' -f2 | tr -d ' ')"
     pubkey="$("${OPENSSL}" ec -in "${ACCOUNT_KEY}" -noout -text 2>/dev/null | tr -d '\n ' | grep -Eo 'pub:.*ASN1' | _sed -e 's/^pub://' -e 's/ASN1$//' | tr -d ':')"
 

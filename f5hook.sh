@@ -140,7 +140,7 @@ deploy_cert() {
     process_errors "DEBUG (hook function: deploy_cert)\n   DOMAIN=${DOMAIN}\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n   TIMESTAMP=${TIMESTAMP}\n"
     
     # ALIAS is a directory name
-    ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $5 }')"
+    ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $(NF-1) }')"
 
     ## Test if cert and key exist
     key=true && [[ "$(tmsh list sys file ssl-key ${ALIAS} 2>&1)" =~ "was not found" ]] && key=false
