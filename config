@@ -1,6 +1,6 @@
 ## F5 BIG-IP ACME Client Provider Configuration File
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250509-1
+## Version: 20250801-1
 ## Description: Contains per-provider ACME client configuration settings
 
 
@@ -32,6 +32,12 @@ OCSP_MUST_STAPLE="no"
 
 ## Threshold in days when a certificate must be renewed (default: 30 days)
 THRESHOLD=30
+
+## Amount of seconds to wait for processing of order until erroring out (default: 0 => no timeout)
+ORDER_TIMEOUT=0
+
+## Amount of seconds to wait for domain validation processing until erroring out (default: 0 => no timeout)
+VALIDATION_TIMEOUT=0
 
 ## Option to select the ACMEv2 methods: http-01 (default) or dns-01
 ACME_METHOD="http-01"
