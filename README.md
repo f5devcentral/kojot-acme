@@ -4,7 +4,7 @@
 
 *Major Updates May 09, 2025 - See updates section at bottom for changes*
 
-*Minor Updates June 27, 2025 - See updates section at bottom for changes*
+*Minor Updates August 01, 2025 - See updates section at bottom for changes*
 
 This project defines a set of utility functions for the [Dehydrated](https://github.com/dehydrated-io/dehydrated) ACMEv2 client, supporting direct integration with F5 BIG-IP, and including additional advanced features:
 
@@ -136,6 +136,8 @@ Within the ```/shared/acme/config``` file are a number of additional client attr
 | CONTACT_EMAIL        | Defines the registration account name and must be unique per provider requirements                                                                                                                                                                                              |
 | OCSP_MUST_STAPLE     | Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no)                                                                                                                                                                                                   |
 | THRESHOLD            | Threshold in days when a certificate must be renewed (default: 30 days)                                                                                                                                                                                                         |
+| VALIDATION_TIMEOUT   | Amount of seconds to wait for domain validation processing until erroring out (default: 0 => no timeout)                                                                                                                                                                        |
+| ORDER_TIMEOUT        | Amount of seconds to wait for processing of order until erroring out (default: 0 => no timeout)                                                                                                                                                                                 |
 | ACME_METHOD          | Defines the ACMEv2 validation method to use (http-01, or dns-01) (default: http-01)                                                                                                                                                                                             |
 | DNS_2_PHASE          | When using dns-01 validation, enabled manual 2 phase validation (create DNS entry manually, clean DNS entry manually)                                                                                                                                                           |
 | DNS_DELAY            | When using dns-01 validation, defines the delay between deploying the DNS validation, and cleaning up the DNS entry (allows additional time for slow changes)                                                                                                                   |
@@ -153,7 +155,7 @@ Within the ```/shared/acme/config``` file are a number of additional client attr
 | EAB_KID/EAB_HMAC_KEY | Extended Account Binding (EAB) support                                                                                                                                                                                                                                          |
 | FULLCHAIN            | Set to true to install the complete certificate chain, or false to only install the leaf certificate (default: true)                                                                                                                                                            |
 | ZEROCYLE             | Set to preferred number of zeroization cycles for shredding created private keys (default: 3 cycles)                                                                                                                                                                            |
-| CREATEPROFILE        | Set to true to generate new client SSL profiles with new certs/keys (default: false)                                                                                                                                                                                            |
+| CREATEPROFILE        | Set to true to generate new client SSL profiles with new certs/keys (default: false)                                                                                                                                                                                            |                                                                                                                                                                                          |
 </details>
 
 <details>
@@ -788,7 +790,7 @@ Special thanks to:
 #### Updates
 
 <details>
-<summary><b>Major Updates: 2025 May</b></summary>
+<summary><b>Updates: 2025 May</b></summary>
 
 * [Issue 6: Add DNS-01 support](https://github.com/f5devcentral/kojot-acme/issues/6)
 * [Issue 8: Fix for 'f5acmehandler.sh does not provide an option to send syslog message in case of issues'](https://github.com/f5devcentral/kojot-acme/issues/8)
@@ -802,7 +804,7 @@ Special thanks to:
 </details>
 
 <details>
-<summary><b>Minor Updates: 2025 June 3</b></summary>
+<summary><b>Updates: 2025 June 3</b></summary>
 
 * [Issue 15: Fix for 'OCSP Stapling throws error with LetsEncrypt'](https://github.com/f5devcentral/kojot-acme/issues/15)
 * [Issue 16: Fix for 'When schedule option is selected f5acmehandler.sh generates error and does not start renewal process'](https://github.com/f5devcentral/kojot-acme/issues/16)
@@ -810,7 +812,7 @@ Special thanks to:
 </details>
 
 <details>
-<summary><b>Minor Updates: 2025 June 16</b></summary>
+<summary><b>Updates: 2025 June 16</b></summary>
 
 * [Issue 17: iFiles not created after first run](https://github.com/f5devcentral/kojot-acme/issues/17)
 * [Issue 18: f5acmehandler.sh does not synch when FORCE_SYNC is set to true](https://github.com/f5devcentral/kojot-acme/issues/18)
@@ -820,9 +822,25 @@ Special thanks to:
 </details>
 
 <details>
-<summary><b>Minor Updates: 2025 June 27</b></summary>
+<summary><b>Updates: 2025 June 27</b></summary>
 
 * Add support for F5 DNS integration for dns-01 validation. See the dns_f5dns.sh script in the dnsapi folder for instructions.
+
+</details>
+
+<details>
+<summary><b>Updates: 2025 August 01</b></summary>
+
+* [Issue 20: Reporting does not show unsuccessful certificate creation](https://github.com/f5devcentral/kojot-acme/issues/20)
+    - Added 'echo "   $ERR" >> ${REPORT}' to f5_process_errors function to inject all errors and panics into the report.
+* [Issue 21: ACME EAB with EC key not working](https://github.com/f5devcentral/kojot-acme/issues/21)
+    - The local copy of Dehydrated updated and validated per suggested fix.
+    - **NOTE**: To get this fix you must also update the Dehydrated script in the bin folder.
+* [Issue 22: f5hooks does not create new files for non-existing certificates](https://github.com/f5devcentral/kojot-acme/issues/22)
+    - The f5hook.sh script has beeen updated and validated per suggested fix.
+* [Issue 26: Dehydrated client does not timeout, f5acmehandler.sh hangs and stops processing the data group](https://github.com/f5devcentral/kojot-acme/issues/26)
+    - Updated Dehydrated script to include new **ORDER_TIMEOUT** and **VALIDATION_TIMEOUT** provider configuration values (default 0 => no timeout)
+* Updated Dehydrated script from origin repo. See [CHANGELOG](https://github.com/dehydrated-io/dehydrated/blob/master/CHANGELOG) for details.
 
 </details>
 
