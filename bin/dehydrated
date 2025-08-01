@@ -5,6 +5,9 @@
 #
 # This script is licensed under The MIT License (see LICENSE for more information).
 
+## UPDATED TO ADDRESS KOJOT ACME INTEGRATION SUPPORT (search for "KOJOT UPDATE" in script)
+## Version: 20250801-1
+
 set -e
 set -u
 set -o pipefail
@@ -17,7 +20,7 @@ umask 077 # paranoid umask, we're creating private keys
 exec 3>&-
 exec 4>&-
 
-VERSION="0.7.2"
+VERSION="0.7.3"
 
 # Find directory in which this script is stored by traversing all symbolic links
 SOURCE="${0}"
@@ -291,6 +294,10 @@ store_configvars() {
   __OPENSSL_CNF="${OPENSSL_CNF}"
   __RENEW_DAYS="${RENEW_DAYS}"
   __IP_VERSION="${IP_VERSION}"
+  __ACME_PROFILE="${ACME_PROFILE}"
+  __ORDER_TIMEOUT=${ORDER_TIMEOUT}
+  __VALIDATION_TIMEOUT=${VALIDATION_TIMEOUT}
+  __KEEP_GOING=${KEEP_GOING}
 }
 
 reset_configvars() {
@@ -309,6 +316,10 @@ reset_configvars() {
   OPENSSL_CNF="${__OPENSSL_CNF}"
   RENEW_DAYS="${__RENEW_DAYS}"
   IP_VERSION="${__IP_VERSION}"
+  ACME_PROFILE="${__ACME_PROFILE}"
+  ORDER_TIMEOUT=${__ORDER_TIMEOUT}
+  VALIDATION_TIMEOUT=${__VALIDATION_TIMEOUT}
+  KEEP_GOING="${__KEEP_GOING}"
 }
 
 hookscript_bricker_hook() {
@@ -322,11 +333,13 @@ hookscript_bricker_hook() {
 # verify configuration values
 verify_config() {
   [[ "${CHALLENGETYPE}" == "http-01" || "${CHALLENGETYPE}" == "dns-01" || "${CHALLENGETYPE}" == "tls-alpn-01" ]] || _exiterr "Unknown challenge type ${CHALLENGETYPE}... cannot continue."
-  if [[ "${CHALLENGETYPE}" = "dns-01" ]] && [[ -z "${HOOK}" ]]; then
-    _exiterr "Challenge type dns-01 needs a hook script for deployment... cannot continue."
-  fi
-  if [[ "${CHALLENGETYPE}" = "http-01" && ! -d "${WELLKNOWN}" && ! "${COMMAND:-}" = "register" ]]; then
-    _exiterr "WELLKNOWN directory doesn't exist, please create ${WELLKNOWN} and set appropriate permissions."
+  if [[ "${COMMAND:-}" =~ sign_domains|sign_csr ]]; then
+    if [[ "${CHALLENGETYPE}" = "dns-01" ]] && [[ -z "${HOOK}" ]]; then
+      _exiterr "Challenge type dns-01 needs a hook script for deployment... cannot continue."
+    fi
+    if [[ "${CHALLENGETYPE}" = "http-01" ]] && [[ ! -d "${WELLKNOWN}" ]]; then
+      _exiterr "WELLKNOWN directory doesn't exist, please create ${WELLKNOWN} and set appropriate permissions."
+    fi
   fi
   [[ "${KEY_ALGO}" == "rsa" || "${KEY_ALGO}" == "prime256v1" || "${KEY_ALGO}" == "secp384r1" || "${KEY_ALGO}" == "secp521r1" ]] || _exiterr "Unknown public key algorithm ${KEY_ALGO}... cannot continue."
   if [[ -n "${IP_VERSION}" ]]; then
@@ -334,6 +347,8 @@ verify_config() {
   fi
   [[ "${API}" == "auto" || "${API}" == "1" || "${API}" == "2" ]] || _exiterr "Unsupported API version defined in config: ${API}"
   [[ "${OCSP_DAYS}" =~ ^[0-9]+$ ]] || _exiterr "OCSP_DAYS must be a number"
+  [[ "${ORDER_TIMEOUT}" =~ ^[0-9]+$ ]] || _exiterr "ORDER_TIMEOUT must be a number"
+  [[ "${VALIDATION_TIMEOUT}" =~ ^[0-9]+$ ]] || _exiterr "VALIDATION_TIMEOUT must be a number"
 }
 
 # Setup default config values, search for and load configuration files
@@ -355,6 +370,8 @@ load_config() {
   CA_LETSENCRYPT_TEST="https://acme-staging-v02.api.letsencrypt.org/directory"
   CA_BUYPASS="https://api.buypass.com/acme/directory"
   CA_BUYPASS_TEST="https://api.test4.buypass.no/acme/directory"
+  CA_GOOGLE="https://dv.acme-v02.api.pki.goog/directory"
+  CA_GOOGLE_TEST="https://dv.acme-v02.test-api.pki.goog/directory"
 
   # Default values
   CA="letsencrypt"
@@ -372,7 +389,7 @@ load_config() {
   HOOK=
   PREFERRED_CHAIN=
   HOOK_CHAIN="no"
-  RENEW_DAYS="30"
+  RENEW_DAYS="32"
   KEYSIZE="4096"
   WELLKNOWN=
   PRIVATE_KEY_RENEW="yes"
@@ -388,9 +405,14 @@ load_config() {
   IP_VERSION=
   CHAINCACHE=
   AUTO_CLEANUP="no"
+  AUTO_CLEANUP_DELETE="no"
   DEHYDRATED_USER=
   DEHYDRATED_GROUP=
   API="auto"
+  ACME_PROFILE=""
+  ORDER_TIMEOUT=0
+  VALIDATION_TIMEOUT=0
+  KEEP_GOING="no"
 
   if [[ -z "${CONFIG:-}" ]]; then
     echo "#" >&2
@@ -481,6 +503,10 @@ load_config() {
     CA="${CA_BUYPASS}"
   elif [ "${CA}" = "buypass-test" ]; then
     CA="${CA_BUYPASS_TEST}"
+  elif [ "${CA}" = "google" ]; then
+    CA="${CA_GOOGLE}"
+  elif [ "${CA}" = "google-test" ]; then
+    CA="${CA_GOOGLE_TEST}"
   fi
 
   if [[ -z "${OLDCA}" ]] && [[ "${CA}" = "https://acme-v02.api.letsencrypt.org/directory" ]]; then
@@ -544,6 +570,10 @@ load_config() {
   [[ -n "${PARAM_KEY_ALGO:-}" ]] && KEY_ALGO="${PARAM_KEY_ALGO}"
   [[ -n "${PARAM_OCSP_MUST_STAPLE:-}" ]] && OCSP_MUST_STAPLE="${PARAM_OCSP_MUST_STAPLE}"
   [[ -n "${PARAM_IP_VERSION:-}" ]] && IP_VERSION="${PARAM_IP_VERSION}"
+  [[ -n "${PARAM_ACME_PROFILE:-}" ]] && ACME_PROFILE="${PARAM_ACME_PROFILE}"
+  [[ -n "${PARAM_ORDER_TIMEOUT:-}" ]] && ORDER_TIMEOUT="${PARAM_ORDER_TIMEOUT}"
+  [[ -n "${PARAM_VALIDATION_TIMEOUT:-}" ]] && VALIDATION_TIMEOUT="${PARAM_VALIDATION_TIMEOUT}"
+  [[ -n "${PARAM_KEEP_GOING:-}" ]] && KEEP_GOING="${PARAM_KEEP_GOING}"
 
   if [ "${PARAM_FORCE_VALIDATION:-no}" = "yes" ] && [ "${PARAM_FORCE:-no}" = "no" ]; then
     _exiterr "Argument --force-validation can only be used in combination with --force (-x)"
@@ -587,6 +617,10 @@ init_system() {
     _exiterr "Problem retrieving ACME/CA-URLs, check if your configured CA points to the directory entrypoint."
     # Since reg URI is missing from directory we will assume it is the same as CA_NEW_REG without the new part
     CA_REG=${CA_NEW_REG/new-reg/reg}
+
+    if [[ -n "${ACME_PROFILE}" ]]; then
+      _exiterr "ACME profiles are not supported in ACME v1."
+    fi
   else
     CA_NEW_ORDER="$(printf "%s" "${CA_DIRECTORY}" | get_json_string_value newOrder)" &&
     CA_NEW_NONCE="$(printf "%s" "${CA_DIRECTORY}" | get_json_string_value newNonce)" &&
@@ -595,6 +629,35 @@ init_system() {
     CA_REQUIRES_EAB="$(printf "%s" "${CA_DIRECTORY}" | get_json_bool_value -p '"meta","externalAccountRequired"' || echo false)" &&
     CA_REVOKE_CERT="$(printf "%s" "${CA_DIRECTORY}" | get_json_string_value revokeCert)" ||
     _exiterr "Problem retrieving ACME/CA-URLs, check if your configured CA points to the directory entrypoint."
+
+    # Checking ACME profile
+    if [[ -n "${ACME_PROFILE}" ]]; then
+      # Extract available profiles from CA directory
+      declare -A available_profiles=()
+      while IFS=$'\t' read -r path value; do
+        if [[ "${value}" =~ ^\"([^\"]+)\"$ ]]; then
+          value=${BASH_REMATCH[1]}
+        fi
+        if [[ "${path}" =~ ^\[\"([^\"]+)\"\]$ ]]; then
+          available_profiles[${BASH_REMATCH[1]}]=$value
+        fi
+      done <<< "$(printf "%s" "${CA_DIRECTORY}" | get_json_dict_value -p '"meta","profiles"' 2>/dev/null)"
+      if [[ ${#available_profiles[@]} -eq 0 ]]; then
+          _exiterr "ACME profile not supported by this CA"
+      fi
+
+      # Check if the requested profile is available
+      found_profile="no"
+      for profile in "${!available_profiles[@]}"; do
+        if [[ "${profile}" == "${ACME_PROFILE}" ]]; then
+          found_profile="yes"
+          break
+        fi
+      done
+      if [[ "${found_profile}" == "no" ]]; then
+        _exiterr "ACME profile '${ACME_PROFILE}' not found, available profiles:$(for key in "${!available_profiles[@]}"; do printf "\n  %s: %s" "${key}" "${available_profiles[$key]}"; done)"
+      fi
+    fi
   fi
 
   # Export some environment variables to be used in hook script
@@ -637,7 +700,9 @@ init_system() {
     fi
   fi
 
-  if ("${OPENSSL}" rsa -in "${ACCOUNT_KEY}" -check 2>/dev/null > /dev/null); then
+  ## KOJOT UPDATE to address EC key type support (Kojot issue 21)
+  ## if ("${OPENSSL}" rsa -in "${ACCOUNT_KEY}" -check 2>/dev/null > /dev/null); then
+  if ("${OPENSSL}" rsa -in "${ACCOUNT_KEY}" 2>/dev/null > /dev/null); then
     # Get public components from private key and calculate thumbprint
     pubExponent64="$(printf '%x' "$("${OPENSSL}" rsa -in "${ACCOUNT_KEY}" -noout -text | awk '/publicExponent/ {print $2}')" | hex2bin | urlbase64)"
     pubMod64="$("${OPENSSL}" rsa -in "${ACCOUNT_KEY}" -noout -modulus | cut -d'=' -f2 | hex2bin | urlbase64)"
@@ -700,6 +765,14 @@ init_system() {
             FAILED=true
           fi
         fi
+      fi
+    fi
+
+     # Google special sauce
+    if [[ "${CA}" = "${CA_GOOGLE}" ]]; then
+      if [[ -z "${CONTACT_EMAIL}" ]] || [[ -z "${EAB_KID:-}" ]] || [[ -z "${EAB_HMAC_KEY:-}" ]]; then
+          echo "Google requires contact email, EAB_KID and EAB_HMAC_KEY to be manually configured (see https://cloud.google.com/certificate-manager/docs/public-ca-tutorial)"
+          FAILED=true
       fi
     fi
 
@@ -871,14 +944,14 @@ http_request() {
   set +e
   # shellcheck disable=SC2086
   if [[ "${1}" = "head" ]]; then
-    statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -s -w "%{http_code}" -o "${tempcont}" "${2}" -I)"
+    statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -s -w "%{http_code}" -o "${tempcont}" -H 'Cache-Control: no-cache' "${2}" -I)"
     curlret="${?}"
     touch "${tempheaders}"
   elif [[ "${1}" = "get" ]]; then
-    statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -L -s -w "%{http_code}" -o "${tempcont}" -D "${tempheaders}" "${2}")"
+    statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -L -s -w "%{http_code}" -o "${tempcont}" -D "${tempheaders}" -H 'Cache-Control: no-cache' "${2}")"
     curlret="${?}"
   elif [[ "${1}" = "post" ]]; then
-    statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -s -w "%{http_code}" -o "${tempcont}" "${2}" -D "${tempheaders}" -H 'Content-Type: application/jose+json' -d "${3}")"
+    statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -s -w "%{http_code}" -o "${tempcont}" "${2}" -D "${tempheaders}" -H 'Cache-Control: no-cache' -H 'Content-Type: application/jose+json' -d "${3}")"
     curlret="${?}"
   else
     set -e
@@ -1009,13 +1082,13 @@ signed_request() {
 # Extracts all subject names from a CSR
 # Outputs either the CN, or the SANs, one per line
 extract_altnames() {
-  csr="${1}" # the CSR itself (not a file)
+  csrfile="${1}" # path to CSR file
 
-  if ! <<<"${csr}" "${OPENSSL}" req -verify -noout 2>/dev/null; then
+  if ! "${OPENSSL}" req -in "${csrfile}" -verify -noout >/dev/null; then
     _exiterr "Certificate signing request isn't valid"
   fi
 
-  reqtext="$( <<<"${csr}" "${OPENSSL}" req -noout -text )"
+  reqtext="$("${OPENSSL}" req -in "${csrfile}" -noout -text)"
   if <<<"${reqtext}" grep -q '^[[:space:]]*X509v3 Subject Alternative Name:[[:space:]]*$'; then
     # SANs used, extract these
     altnames="$( <<<"${reqtext}" awk '/X509v3 Subject Alternative Name:/{print;getline;print;}' | tail -n1 )"
@@ -1043,7 +1116,7 @@ get_last_cn() {
 
 # Create certificate for domain(s) and outputs it FD 3
 sign_csr() {
-  csr="${1}" # the CSR itself (not a file)
+  csrfile="${1}" # path to CSR file
 
   if { true >&3; } 2>/dev/null; then
     : # fd 3 looks OK
@@ -1082,7 +1155,12 @@ sign_csr() {
     challenge_identifiers="[${challenge_identifiers%, }]"
 
     echo " + Requesting new certificate order from CA..."
-    order_location="$(signed_request "${CA_NEW_ORDER}" '{"identifiers": '"${challenge_identifiers}"'}' 4>&1 | grep -i ^Location: | cut -d':' -f2- | tr -d ' \t\r\n')"
+    local order_payload='{"identifiers": '"${challenge_identifiers}"
+    if [[ -n "${ACME_PROFILE}" ]]; then
+      order_payload="${order_payload}"',"profile":"'"${ACME_PROFILE}"'"'
+    fi
+    order_payload="${order_payload}"'}'
+    order_location="$(signed_request "${CA_NEW_ORDER}" "${order_payload}" 4>&1 | grep -i ^Location: | cut -d':' -f2- | tr -d ' \t\r\n')"
     result="$(signed_request "${order_location}" "" | jsonsh)"
 
     order_authorizations="$(echo "${result}" | get_json_array_values authorizations)"
@@ -1218,8 +1296,14 @@ sign_csr() {
 
     reqstatus="$(echo "${result}" | get_json_string_value status)"
 
+    local waited=0
     while [[ "${reqstatus}" = "pending" ]] || [[ "${reqstatus}" = "processing" ]]; do
+      if [ ${VALIDATION_TIMEOUT} -gt 0 ] && [ ${waited} -gt ${VALIDATION_TIMEOUT} ]; then
+        _exiterr "Timed out waiting for processing of domain validation (still ${reqstatus})"
+      fi
+      echo " + Validation is ${reqstatus}..."
       sleep 1
+      waited=$((waited+1))
       if [[ "${API}" -eq 2 ]]; then
         result="$(signed_request "${challenge_uris[${idx}]}" "" | jsonsh)"
       else
@@ -1268,25 +1352,30 @@ sign_csr() {
 
   # Finally request certificate from the acme-server and store it in cert-${timestamp}.pem and link from cert.pem
   echo " + Requesting certificate..."
-  csr64="$( <<<"${csr}" "${OPENSSL}" req -config "${OPENSSL_CNF}" -outform DER | urlbase64)"
+  csr64="$("${OPENSSL}" req -in "${csrfile}" -config "${OPENSSL_CNF}" -outform DER | urlbase64)"
   if [[ ${API} -eq 1 ]]; then
     crt64="$(signed_request "${CA_NEW_CERT}" '{"resource": "new-cert", "csr": "'"${csr64}"'"}' | "${OPENSSL}" base64 -e)"
     crt="$( printf -- '-----BEGIN CERTIFICATE-----\n%s\n-----END CERTIFICATE-----\n' "${crt64}" )"
   else
     result="$(signed_request "${finalize}" '{"csr": "'"${csr64}"'"}' | jsonsh)"
+    waited=0
     while :; do
       orderstatus="$(echo "${result}" | get_json_string_value status)"
       case "${orderstatus}"
       in
         "processing" | "pending")
+          if [ ${ORDER_TIMEOUT} -gt 0 ] && [ ${waited} -gt ${ORDER_TIMEOUT} ]; then
+            _exiterr "Timed out waiting for processing of order (still ${orderstatus})"
+          fi
           echo " + Order is ${orderstatus}..."
           sleep 2;
+          waited=$((waited+2))
           ;;
         "valid")
           break;
           ;;
         *)
-          _exiterr "Order in status ${orderstatus}"
+          _exiterr "Order has invalid/unknown status: ${orderstatus}"
           ;;
       esac
       result="$(signed_request "${order_location}" "" | jsonsh)"
@@ -1347,7 +1436,6 @@ get_issuer_hash() {
 
 get_ocsp_url() {
   certificate="${1}"
-  echo "FOO certificate: ${certificate}"
   "${OPENSSL}" x509 -in "${certificate}" -noout -ocsp_uri
 }
 
@@ -1488,7 +1576,7 @@ sign_domain() {
       fi
     done
     if [[ "${domain}" =~ ^ip: ]]; then
-      SUBJ="/CN=${domain:3}/"
+      SUBJ="/"
     else
       SUBJ="/CN=${domain}/"
     fi
@@ -1511,7 +1599,7 @@ sign_domain() {
 
   crt_path="${certdir}/cert-${timestamp}.pem"
   # shellcheck disable=SC2086
-  sign_csr "$(< "${certdir}/cert-${timestamp}.csr")" ${altnames} 3>"${crt_path}"
+  sign_csr "${certdir}/cert-${timestamp}.csr" ${altnames} 3>"${crt_path}"
 
   # Create fullchain.pem
   echo " + Creating fullchain.pem..."
@@ -1556,6 +1644,42 @@ sign_domain() {
 
   unset challenge_token
   echo " + Done!"
+}
+
+# Update OCSP stapling file
+update_ocsp_stapling() {
+    local certdir="${1}"
+    local update_ocsp="${2}"
+    local cert="${3}"
+    local chain="${4}"
+
+    local ocsp_url="$(get_ocsp_url "${cert}")"
+
+    if [[ -z "${ocsp_url}" ]]; then
+      echo " ! ERROR: OCSP stapling requested but no OCSP url found in certificate." >&2
+      echo " ! Keep in mind that some CAs ended support for OCSP: https://letsencrypt.org/2024/12/05/ending-ocsp/" >&2
+      return 1
+    fi
+
+    if [[ ! -e "${certdir}/ocsp.der" ]]; then
+      update_ocsp="yes"
+    elif ! ("${OPENSSL}" ocsp -no_nonce -issuer "${chain}" -verify_other "${chain}" -cert "${cert}" -respin "${certdir}/ocsp.der" -status_age $((OCSP_DAYS*24*3600)) 2>&1 | grep -q "${cert}: good"); then
+      update_ocsp="yes"
+    fi
+
+    if [[ "${update_ocsp}" = "yes" ]]; then
+      echo " + Updating OCSP stapling file"
+      ocsp_timestamp="$(date +%s)"
+      if grep -qE "^(openssl (0|(1\.0))\.)|(libressl (1|2|3)\.)" <<< "$(${OPENSSL} version | awk '{print tolower($0)}')"; then
+        ocsp_log="$("${OPENSSL}" ocsp -no_nonce -issuer "${chain}" -verify_other "${chain}" -cert "${cert}" -respout "${certdir}/ocsp-${ocsp_timestamp}.der" -url "${ocsp_url}" -header "HOST" "$(echo "${ocsp_url}" | _sed -e 's/^http(s?):\/\///' -e 's/\/.*$//g')" 2>&1)" || _exiterr "Fetching of OCSP information failed. Please note that some CAs (e.g. LetsEncrypt) do no longer support OCSP. Error message: ${ocsp_log}"
+      else
+        ocsp_log="$("${OPENSSL}" ocsp -no_nonce -issuer "${chain}" -verify_other "${chain}" -cert "${cert}" -respout "${certdir}/ocsp-${ocsp_timestamp}.der" -url "${ocsp_url}" 2>&1)" || _exiterr "Fetching of OCSP information failed. Please note that some CAs (e.g. LetsEncrypt) do no longer support OCSP. Error message: ${ocsp_log}"
+      fi
+      ln -sf "ocsp-${ocsp_timestamp}.der" "${certdir}/ocsp.der"
+      [[ -n "${HOOK}" ]] && (altnames="${domain} ${morenames}" "${HOOK}" "deploy_ocsp" "${domain}" "${certdir}/ocsp.der" "${ocsp_timestamp}" || _exiterr 'deploy_ocsp hook returned with non-zero exit code')
+    else
+      echo " + OCSP stapling file is still valid (skipping update)"
+    fi
 }
 
 # Usage: --version (-v)
@@ -1776,7 +1900,7 @@ command_sign_domains() {
 	# All settings that are allowed here should also be stored and
 	# restored in store_configvars() and reset_configvars()
         case "${config_var}" in
-          KEY_ALGO|OCSP_MUST_STAPLE|OCSP_FETCH|OCSP_DAYS|PRIVATE_KEY_RENEW|PRIVATE_KEY_ROLLOVER|KEYSIZE|CHALLENGETYPE|HOOK|PREFERRED_CHAIN|WELLKNOWN|HOOK_CHAIN|OPENSSL_CNF|RENEW_DAYS)
+          KEY_ALGO|OCSP_MUST_STAPLE|OCSP_FETCH|OCSP_DAYS|PRIVATE_KEY_RENEW|PRIVATE_KEY_ROLLOVER|KEYSIZE|CHALLENGETYPE|HOOK|PREFERRED_CHAIN|WELLKNOWN|HOOK_CHAIN|OPENSSL_CNF|RENEW_DAYS|ACME_PROFILE|ORDER_TIMEOUT|VALIDATION_TIMEOUT|KEEP_GOING)
             echo "   + ${config_var} = ${config_value}"
             declare -- "${config_var}=${config_value}"
             ;;
@@ -1793,16 +1917,18 @@ command_sign_domains() {
     skip="no"
 
     # Allow for external CSR generation
-    local csr=""
+    local csrfile=""
     if [[ -n "${HOOK}" ]]; then
       csr="$("${HOOK}" "generate_csr" "${domain}" "${certdir}" "${domain} ${morenames}")" || _exiterr 'generate_csr hook returned with non-zero exit code'
       if grep -qE "\-----BEGIN (NEW )?CERTIFICATE REQUEST-----" <<< "${csr}"; then
-        altnames="$(extract_altnames "${csr}")"
+        csrfile="$(_mktemp)"
+        cat > "${csrfile}" <<< "${csr}"
+        altnames="$(extract_altnames "${csrfile}")"
         domain="$(cut -d' ' -f1 <<< "${altnames}")"
         morenames="$(cut -s -d' ' -f2- <<< "${altnames}")"
         echo " + Using CSR from hook script (real names: ${altnames})"
       else
-        csr=""
+        csrfile=""
       fi
     fi
 
@@ -1852,9 +1978,12 @@ command_sign_domains() {
     # Sign certificate for this domain
     if [[ ! "${skip}" = "yes" ]]; then
       update_ocsp="yes"
-      [[ -z "${csr}" ]] || printf "%s" "${csr}" > "${certdir}/cert-${timestamp}.csr"
+      if [[ -n "${csrfile}" ]]; then
+        cat "${csrfile}" > "${certdir}/cert-${timestamp}.csr"
+        rm "${csrfile}"
+      fi
       # shellcheck disable=SC2086
-      if [[ "${PARAM_KEEP_GOING:-}" = "yes" ]]; then
+      if [[ "${KEEP_GOING:-}" = "yes" ]]; then
         skip_exit_hook=yes
         sign_domain "${certdir}" "${timestamp}" "${domain}" ${morenames} &
         wait $! || exit_with_errorcode=1
@@ -1865,40 +1994,13 @@ command_sign_domains() {
     fi
 
     if [[ "${OCSP_FETCH}" = "yes" ]]; then
-      local ocsp_url
-      ocsp_url="$(get_ocsp_url "${cert}")"
-      echo "FOO URL: ${ocsp_url}" 
-
-      if [[ ! -e "${certdir}/ocsp.der" ]]; then
-        update_ocsp="yes"
-      elif ! ("${OPENSSL}" ocsp -no_nonce -issuer "${chain}" -verify_other "${chain}" -cert "${cert}" -respin "${certdir}/ocsp.der" -status_age $((OCSP_DAYS*24*3600)) 2>&1 | grep -q "${cert}: good"); then
-        update_ocsp="yes"
-      fi
-
-      if [[ "${update_ocsp}" = "yes" ]]; then
-        echo " + Updating OCSP stapling file"
-        ocsp_timestamp="$(date +%s)"
-        if grep -qE "^(openssl (0|(1\.0))\.)|(libressl (1|2|3)\.)" <<< "$(${OPENSSL} version | awk '{print tolower($0)}')"; then
-          echo "FOO: ERROR 1"
-          echo "FOO: ${OPENSSL}"
-          echo "FOO: ${chain}"
-          echo "FOO: ${cert}"
-          echo "FOO: ${certdir}/ocsp-${ocsp_timestamp}.der"
-          echo "FOO: ${ocsp_url}"
-          ocsp_log="$("${OPENSSL}" ocsp -no_nonce -issuer "${chain}" -verify_other "${chain}" -cert "${cert}" -respout "${certdir}/ocsp-${ocsp_timestamp}.der" -url "${ocsp_url}" -header "HOST" "$(echo "${ocsp_url}" | _sed -e 's/^http(s?):\/\///' -e 's/\/.*$//g')" 2>&1)" || _exiterr "Error while fetching OCSP information: ${ocsp_log}"
-        else
-          echo "FOO: ERROR 2"
-          echo "FOO: ${OPENSSL}"
-          echo "FOO: ${chain}"
-          echo "FOO: ${cert}"
-          echo "FOO: ${certdir}/ocsp-${ocsp_timestamp}.der"
-          echo "FOO: ${ocsp_url}"
-          ocsp_log="$("${OPENSSL}" ocsp -no_nonce -issuer "${chain}" -verify_other "${chain}" -cert "${cert}" -respout "${certdir}/ocsp-${ocsp_timestamp}.der" -url "${ocsp_url}" 2>&1)" || _exiterr "Error while fetching OCSP information: ${ocsp_log}"
-        fi
-        ln -sf "ocsp-${ocsp_timestamp}.der" "${certdir}/ocsp.der"
-        [[ -n "${HOOK}" ]] && (altnames="${domain} ${morenames}" "${HOOK}" "deploy_ocsp" "${domain}" "${certdir}/ocsp.der" "${ocsp_timestamp}" || _exiterr 'deploy_ocsp hook returned with non-zero exit code')
+      if [[ "${KEEP_GOING:-}" = "yes" ]]; then
+        skip_exit_hook=yes
+        update_ocsp_stapling "${certdir}" "${update_ocsp}" "${cert}" "${chain}" &
+        wait $! || exit_with_errorcode=1
+        skip_exit_hook=no
       else
-        echo " + OCSP stapling file is still valid (skipping update)"
+        update_ocsp_stapling "${certdir}" "${update_ocsp}" "${cert}" "${chain}"
       fi
     fi
   done
@@ -1909,8 +2011,8 @@ command_sign_domains() {
 
   [[ -n "${HOOK}" ]] && ("${HOOK}" "exit_hook" || echo 'exit_hook returned with non-zero exit code!' >&2)
   if [[ "${AUTO_CLEANUP}" == "yes" ]]; then
-    echo "+ Running automatic cleanup"
-    command_cleanup noinit
+    echo " + Running automatic cleanup"
+    PARAM_CLEANUPDELETE="${AUTO_CLEANUP_DELETE:-no}" command_cleanup noinit | _sed 's/^/ + /g'
   fi
 
   exit "${exit_with_errorcode}"
@@ -1926,19 +2028,18 @@ command_sign_csr() {
   exec 3>&1 1>&2
 
   # load csr
-  csrfile="${1}"
+  local csrfile="${1}"
   if [ ! -r "${csrfile}" ]; then
     _exiterr "Could not read certificate signing request ${csrfile}"
   fi
-  csr="$(cat "${csrfile}")"
 
   # extract names
-  altnames="$(extract_altnames "${csr}")"
+  altnames="$(extract_altnames "${csrfile}")"
 
   # gen cert
   certfile="$(_mktemp)"
   # shellcheck disable=SC2086
-  sign_csr "${csr}" ${altnames} 3> "${certfile}"
+  sign_csr "${csrfile}" ${altnames} 3> "${certfile}"
 
   # print cert
   echo "# CERT #" >&3
@@ -2378,6 +2479,31 @@ main() {
         check_parameters "${1:-}"
         PARAM_KEY_ALGO="${1}"
         ;;
+
+      # PARAM_Usage: --acme-profile profile_name
+      # PARAM_Description: Use specified ACME profile
+      --acme-profile)
+        shift 1
+        check_parameters "${1:-}"
+        PARAM_ACME_PROFILE="${1}"
+        ;;
+
+      # PARAM_Usage: --order-timeout seconds
+      # PARAM_Description: Amount of seconds to wait for processing of order until erroring out
+      --order-timeout)
+        shift 1
+        check_parameters "${1:-}"
+        PARAM_ORDER_TIMEOUT=${1}
+        ;;
+
+      # PARAM_Usage: --validation-timeout seconds
+      # PARAM_Description: Amount of seconds to wait for processing of domain validations until erroring out
+      --validation-timeout)
+        shift 1
+        check_parameters "${1:-}"
+        PARAM_VALIDATION_TIMEOUT=${1}
+        ;;
+
       *)
         echo "Unknown parameter detected: ${1}" >&2
         echo >&2
