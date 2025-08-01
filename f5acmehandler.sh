@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250616-1
+## Version: 20250801-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -78,6 +78,9 @@ export OCSP_DAYS=5
 export FULLCHAIN=true
 export CREATEPROFILE=false
 export WELLKNOWN="/tmp/wellknown"
+export ORDER_TIMEOUT=0
+export VALIDATION_TIMEOUT=0
+export REPORT
 
 
 ## Send VERBOSE to system variable to allow visibility at hook script
@@ -88,9 +91,9 @@ export VERBOSE="yes"
 f5_process_errors() {
    local ERR="${1}"
    timestamp=$(date +%F_%T)
-   if [[ "$ERR" =~ ^"ERROR" && "$ERRORLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}]  ${ERR}"; fi; fi
+   if [[ "$ERR" =~ ^"ERROR" && "$ERRORLOG" == "true" ]]; then echo "    $ERR" >> ${REPORT} && echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}]  ${ERR}"; fi; fi
    if [[ "$ERR" =~ ^"DEBUG" && "$DEBUGLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
-   if [[ "$ERR" =~ ^"PANIC" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
+   if [[ "$ERR" =~ ^"PANIC" ]]; then echo "    $ERR" >> ${REPORT} && echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
    if [[ "$VERBOSE" == "yes" ]]; then echo -e ">> [${timestamp}]  ${ERR}" && echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
 }
 
@@ -121,6 +124,7 @@ f5_process_report() {
          echo -e "From: ${REPORT_FROM}\nSubject: ${REPORT_SUBJECT}\n\n$(echo -e $(cat ${TMPREPORT}))" | /usr/sbin/ssmtp -C "${ACMEDIR}/config_reporting" "${REPORT_TO}"
       fi   
    fi
+   # echo -e $(cat ${TMPREPORT})
 }
 
 
@@ -209,6 +213,21 @@ f5_generate_new_cert_key() {
    then
       f5_process_errors "PANIC: Connectivity error for (${DOMAIN}). Please verify configuration (${COMMAND}).\n\n"
       echo "    PANIC: Connectivity error for (${DOMAIN}). Please verify configuration (${COMMAND})." >> ${REPORT}
+      continue
+   elif [[ $do =~ "ERROR: Timed out waiting for processing of domain validation (still pending)" ]]
+   then
+      f5_process_errors "PANIC: Timed out waiting for processing of domain validation for (${DOMAIN}).\n\n"
+      echo "    PANIC: Timed out waiting for processing of domain validation for (${DOMAIN})." >> ${REPORT}
+      continue
+   elif [[ $do =~ "ERROR: An error occurred" ]]
+   then
+      f5_process_errors "ERROR: An error occurred for (${DOMAIN}): ${do}.\n\n"
+      echo "    ERROR: An error occurred for (${DOMAIN}): ${do}." >> ${REPORT}
+      continue
+   elif [[ $do =~ "ERROR: Challenge is invalid" ]]
+   then
+      f5_process_errors "ERROR: An error occurred for (${DOMAIN}): ${do}.\n\n"
+      echo "    ERROR: An error occurred for (${DOMAIN}): ${do}." >> ${REPORT}
       continue
    fi
 }
@@ -765,6 +784,7 @@ f5_process_handler_main() {
       else
          f5_process_errors "PANIC: There was an error accessing the ${DGCONFIG} data group. Please re-install.\n"
          echo "    PANIC: There was an error accessing the ${DGCONFIG} data group" >> ${REPORT}
+         f5_process_report "${REPORT}"
          exit 1
       fi
 
