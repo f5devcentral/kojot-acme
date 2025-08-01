@@ -831,6 +831,12 @@ Special thanks to:
 <details>
 <summary><b>Updates: 2025 August 01</b></summary>
 
+* Updated files:
+    - f5acmehandler.sh
+    - f5hook.sh
+    - config
+    - bin/dehydrated
+
 * [Issue 20: Reporting does not show unsuccessful certificate creation](https://github.com/f5devcentral/kojot-acme/issues/20)
     - Added 'echo "   $ERR" >> ${REPORT}' to f5_process_errors function to inject all errors and panics into the report.
 * [Issue 21: ACME EAB with EC key not working](https://github.com/f5devcentral/kojot-acme/issues/21)
