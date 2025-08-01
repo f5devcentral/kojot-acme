@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Hook Script
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250509-1
+## Version: 20250801-1
 ## Description: ACME client hook script used for staging ACME http-01 challenge response, then cleanup
 
 
@@ -29,9 +29,9 @@ process_errors () {
    local ERR="${1}"
    VERBOSE="yes"
    timestamp=$(date +%F_%T)
-   if [[ "$ERR" =~ ^"ERROR" && "$ERRORLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
+   if [[ "$ERR" =~ ^"ERROR" && "$ERRORLOG" == "true" ]]; then echo "   $ERR" >> ${REPORT} && echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
    if [[ "$ERR" =~ ^"DEBUG" && "$DEBUGLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
-   if [[ "$ERR" =~ ^"PANIC" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
+   if [[ "$ERR" =~ ^"PANIC" ]]; then echo "   $ERR" >> ${REPORT} && echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
    if [[ "$VERBOSE" == "yes" ]]; then echo -e ">> [${timestamp}]  ${ERR}"; fi
 }
 
@@ -140,7 +140,8 @@ deploy_cert() {
     process_errors "DEBUG (hook function: deploy_cert)\n   DOMAIN=${DOMAIN}\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n   TIMESTAMP=${TIMESTAMP}\n"
     
     # ALIAS is a directory name
-    ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $5 }')"
+    ## ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $5 }')" -- fix 22
+    ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $(NF-1) }')"
 
     ## Test if cert and key exist
     key=true && [[ "$(tmsh list sys file ssl-key ${ALIAS} 2>&1)" =~ "was not found" ]] && key=false
