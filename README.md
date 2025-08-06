@@ -850,5 +850,12 @@ Special thanks to:
 
 </details>
 
+<details>
+<summary><b>Updates: 2025 August 06</b></summary>
+
+* Fixed issue where ALWAYS_GENERATE_KEY=false and no key exists. This would failed with a "*Key file named "www.f5labs.com" must exist to create a corresponding certificate signing request.*". Now, if ALWAYS_GENERATE_KEY=false and no key already exists, the script will do an initial key creation, then on subsequent requests will keep this key for certificate renewals.
+
+</details>
+
 <br />
 <br />
