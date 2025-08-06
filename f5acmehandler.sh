@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250801-1
+## Version: 20250806-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -437,7 +437,8 @@ f5_process_handler_config() {
          f5_process_errors "DEBUG: ALWAYS_GENERATE_KEY is false and certificate does not exist --> call f5_generate_cert_from_csr.\n"
          echo "    ALWAYS_GENERATE_KEY is false and certificate does not exist. Generating a new cert and key." >> ${REPORT}
          HASCHANGED="true"
-         f5_generate_cert_from_csr "$DOMAIN" "$COMMAND" "$ALIAS"
+         #f5_generate_cert_from_csr "$DOMAIN" "$COMMAND" "$ALIAS"
+         f5_generate_new_cert_key "$DOMAIN" "$COMMAND" "$ALIAS"
       
       elif [[ "$certexists" == "true" && "$CHECK_REVOCATION" == "true" && "$(f5_process_revocation_check "${DOMAIN}")" == "revoked" ]]
       then
