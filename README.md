@@ -184,7 +184,7 @@ The ```f5acmehandler.sh``` utility script also supports a set of commandline opt
 
 <br />
 
-Scheduling is configured by adding the **--scheduling** command line argument, followed by a valid cron string. No validation is performed on the cron string input. Please take care to enter a valid string. A few recommended resources for developing cron strings are here:
+Scheduling is configured by adding the **--schedule** command line argument, followed by a valid cron string. No validation is performed on the cron string input. Please take care to enter a valid string. A few recommended resources for developing cron strings are here:
 
 * [Crontab Guru](https://crontab.guru/)
 * [CronDrive](https://www.crondrive.com/test-cron-expression)
