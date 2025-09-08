@@ -5,7 +5,7 @@
 ## Issues: https://github.com/f5devcentral/kojot-acme/issues
 ## Add the following information to your provider config file:
 ##   DNSAPI=dns_f5dns
-##   F5DNS_Server='https://10.1.10.20'      <-- Your F5 DNS server
+##   F5DNS_SERVER='https://10.1.10.20'      <-- Your F5 DNS server
 ##   F5DNS_TOKEN='2345678987654345678987'   <-- Your shared token
 ##
 ## F5 DNS Configuration:
