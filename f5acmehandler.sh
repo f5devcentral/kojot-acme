@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250806-1
+## Version: 20250910-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -81,10 +81,7 @@ export WELLKNOWN="/tmp/wellknown"
 export ORDER_TIMEOUT=0
 export VALIDATION_TIMEOUT=0
 export REPORT
-
-
-## Send VERBOSE to system variable to allow visibility at hook script
-export VERBOSE="yes"
+export VERBOSE="no"
 
 
 ## Function: process_errors --> print error and debug logs to the log file
