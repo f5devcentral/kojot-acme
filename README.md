@@ -857,5 +857,13 @@ Special thanks to:
 
 </details>
 
+<details>
+<summary><b>Updates: 2025 September 10</b></summary>
+
+* [Issue 27: f5acmehandler.sh creates duplicated log-entries](https://github.com/f5devcentral/kojot-acme/issues/27)
+    - Removed extraneous 'export VERBOSE="yes"'
+
+</details>
+
 <br />
 <br />
