@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250910-1
+## Version: 20250923-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -94,6 +94,7 @@ f5_process_errors() {
    if [[ "$VERBOSE" == "yes" ]]; then echo -e ">> [${timestamp}]  ${ERR}" && echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; if [ -n "$SYSLOG" ]; then /usr/bin/logger -p "${SYSLOG}" "ACME LOG: [${timestamp}] ${ERR}"; fi; fi
 }
 
+export -f f5_process_errors
 
 ## Function: process_dehydrated --> call dehydrated ACME client
 f5_process_dehydrated() {
