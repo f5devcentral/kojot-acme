@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Hook Script
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250801-1
+## Version: 20250923-1
 ## Description: ACME client hook script used for staging ACME http-01 challenge response, then cleanup
 
 
@@ -23,11 +23,9 @@ process_config_file() {
     . "${CONFIG}"
 }
 
-
-## Function: process_errors --> print error and debug logs to the log file
-process_errors () {
+f5_process_errors () {
    local ERR="${1}"
-   VERBOSE="yes"
+   # VERBOSE="yes"
    timestamp=$(date +%F_%T)
    if [[ "$ERR" =~ ^"ERROR" && "$ERRORLOG" == "true" ]]; then echo "   $ERR" >> ${REPORT} && echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
    if [[ "$ERR" =~ ^"DEBUG" && "$DEBUGLOG" == "true" ]]; then echo -e ">> [${timestamp}]  ${ERR}" >> ${LOGFILE}; fi
@@ -35,31 +33,32 @@ process_errors () {
    if [[ "$VERBOSE" == "yes" ]]; then echo -e ">> [${timestamp}]  ${ERR}"; fi
 }
 
+export -f f5_process_errors
 
 ## Function: startup_hook --> called by ACME client when ACME protocol challenge starts
 startup_hook() {
-    process_errors "DEBUG (hook function: startup_hook)\n"
+    f5_process_errors "DEBUG (hook function: startup_hook)\n"
 }
 
 
 ## Function: deploy_challenge --> called by ACME client to insert token into dg_acme_challenge data group for ACME server http-01 challenge
 deploy_challenge() {
     local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
-    process_errors "DEBUG (hook function: deploy_challenge)\n   DOMAIN=${DOMAIN}\n   TOKEN_FILENAME=${TOKEN_FILENAME}\n   TOKEN_VALUE=${TOKEN_VALUE}\n"
+    f5_process_errors "DEBUG (hook function: deploy_challenge)\n   DOMAIN=${DOMAIN}\n   TOKEN_FILENAME=${TOKEN_FILENAME}\n   TOKEN_VALUE=${TOKEN_VALUE}\n"
 
     if [ "${ACME_METHOD}" == "http-01" ]
     then
         ## HTTP-01 method defined --> Add a record to the data group
-        process_errors "DEBUG (hook function: deploy_challenge) -- http-01 access-method\n"            
+        f5_process_errors "DEBUG (hook function: deploy_challenge) -- http-01 access-method\n"            
         tmsh modify ltm data-group internal dg_acme_challenge records add { \"${TOKEN_FILENAME}\" { data \"${TOKEN_VALUE}\" } }
 
     elif [[ "${ACME_METHOD}" == "dns-01" && "${DNS_2_PHASE}" == "false" ]]
     then
         ## DNS-01 method defined --> Call DNS-API script to deploy TXT record
-        process_errors "DEBUG (hook function: deploy_challenge) -- dns-01 access-method\n"
+        f5_process_errors "DEBUG (hook function: deploy_challenge) -- dns-01 access-method\n"
         if [[ ! -f "${ACMEDIR}/dnsapi/${DNSAPI}.sh" ]]
         then
-            process_errors "PANIC: Specified DNS API script does not exist: ${ACMEDIR}/${DNSAPI}.sh\n"
+            f5_process_errors "PANIC: Specified DNS API script does not exist: ${ACMEDIR}/${DNSAPI}.sh\n"
             return 1
         else
             source "${ACMEDIR}/dnsapi/${DNSAPI}.sh"
@@ -71,7 +70,7 @@ deploy_challenge() {
         ## Check if in interactive shell - 2-phase DNS requires this
         if [[ "${INTERACTIVE}" != "true" ]]
         then
-            process_errors "PANIC: 2-Phase Manual DNS specified but not in an interactive shell. Quiting.\n"
+            f5_process_errors "PANIC: 2-Phase Manual DNS specified but not in an interactive shell. Quiting.\n"
             exit 1
         else
             msg1="... 2-Phase Manual DNS - Phase 1 (deploy)\n" 
@@ -84,8 +83,8 @@ deploy_challenge() {
 
     else
         ## Exit and log error on unknown method
-        process_errors "DEBUG (hook function: deploy_challenge) -- unknown access-method\n"
-        process_errors "ERROR: Unknown ACME method defined: ${ACME_METHOD}\n"
+        f5_process_errors "DEBUG (hook function: deploy_challenge) -- unknown access-method\n"
+        f5_process_errors "ERROR: Unknown ACME method defined: ${ACME_METHOD}\n"
         return 1
     fi
 }
@@ -95,23 +94,23 @@ deploy_challenge() {
 clean_challenge() {
     ## Delete the record from the data group
     local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
-    process_errors "DEBUG (hook function: clean_challenge)\n   DOMAIN=${DOMAIN}\n   TOKEN_FILENAME=${TOKEN_FILENAME}\n   TOKEN_VALUE=${TOKEN_VALUE}\n"
+    f5_process_errors "DEBUG (hook function: clean_challenge)\n   DOMAIN=${DOMAIN}\n   TOKEN_FILENAME=${TOKEN_FILENAME}\n   TOKEN_VALUE=${TOKEN_VALUE}\n"
     if [ "${ACME_METHOD}" == "http-01" ]
     then
         ## HTTP-01 method defined --> Add a record to the data group
-        process_errors "DEBUG (hook function: deploy_challenge) -- http-01 access-method\n"   
+        f5_process_errors "DEBUG (hook function: deploy_challenge) -- http-01 access-method\n"   
         tmsh modify ltm data-group internal dg_acme_challenge records delete { \"${TOKEN_FILENAME}\" }
 
     elif [[ "${ACME_METHOD}" == "dns-01" && "${DNS_2_PHASE}" == "false" ]]
     then
-        process_errors "DEBUG (hook function: deploy_challenge) -- sleeping $DNS_DELAY seconds\n"
+        f5_process_errors "DEBUG (hook function: deploy_challenge) -- sleeping $DNS_DELAY seconds\n"
         sleep $DNS_DELAY
 
         ## DNS-01 method defined --> Call DNS-API script to deploy TXT record
-        process_errors "DEBUG (hook function: deploy_challenge) -- dns-01 access-method\n"
+        f5_process_errors "DEBUG (hook function: deploy_challenge) -- dns-01 access-method\n"
         if [[ ! -f "${ACMEDIR}/dnsapi/${DNSAPI}.sh" ]]
         then
-            process_errors "PANIC: Specified DNS API script does not exist: ${ACMEDIR}/${DNSAPI}.sh\n"
+            f5_process_errors "PANIC: Specified DNS API script does not exist: ${ACMEDIR}/${DNSAPI}.sh\n"
             return 1
         else
             source "${ACMEDIR}/dnsapi/${DNSAPI}.sh"
@@ -126,8 +125,8 @@ clean_challenge() {
 
     else
         ## Exit and log error on unknown method
-        process_errors "DEBUG (hook function: deploy_challenge) -- unknown access-method\n"
-        process_errors "ERROR: Unknown ACME method defined: ${ACME_METHOD}\n"
+        f5_process_errors "DEBUG (hook function: deploy_challenge) -- unknown access-method\n"
+        f5_process_errors "ERROR: Unknown ACME method defined: ${ACME_METHOD}\n"
         return 1
     fi
 }
@@ -137,7 +136,7 @@ clean_challenge() {
 deploy_cert() {
     ## Import new cert and key
     local DOMAIN="${1}" KEYFILE="${2}" CERTFILE="${3}" FULLCHAINFILE="${4}" CHAINFILE="${5}" TIMESTAMP="${6}"
-    process_errors "DEBUG (hook function: deploy_cert)\n   DOMAIN=${DOMAIN}\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n   TIMESTAMP=${TIMESTAMP}\n"
+    f5_process_errors "DEBUG (hook function: deploy_cert)\n   DOMAIN=${DOMAIN}\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n   TIMESTAMP=${TIMESTAMP}\n"
     
     # ALIAS is a directory name
     ## ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $5 }')" -- fix 22
@@ -152,7 +151,7 @@ deploy_cert() {
         if [[ "${FULLCHAIN}" == "true" ]]
         then
             ## Create transaction to update existing cert and key
-            process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
+            f5_process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
             echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
@@ -161,7 +160,7 @@ deploy_cert() {
             ) | tmsh
         else
             ## Create transaction to update existing cert and key
-            process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
+            f5_process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
             echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
@@ -173,12 +172,12 @@ deploy_cert() {
         if [[ "${FULLCHAIN}" == "true" ]]
         then
             ## Create cert and key
-            process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
+            f5_process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
             tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
             tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem
         else
-            process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
+            f5_process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
             tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
             tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem
@@ -209,49 +208,49 @@ deploy_cert() {
 ## Function: sync_cert --> called by ACME client, waits for hook script to sync the files before creating the symlinks
 sync_cert() {
     local KEYFILE="${1}" CERTFILE="${2}" FULLCHAINFILE="${3}" CHAINFILE="${4}" REQUESTFILE="${5}"
-    process_errors "DEBUG (hook function: sync_cert)\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n   REQUESTFILE=${REQUESTFILE}\n"
+    f5_process_errors "DEBUG (hook function: sync_cert)\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n   REQUESTFILE=${REQUESTFILE}\n"
 }
 
 
 ## Function: deploy_ocsp --> called by ACME client...
 deploy_ocsp() {
     local DOMAIN="${1}" OCSPFILE="${2}" TIMESTAMP="${3}"
-    process_errors "DEBUG (hook function: deploy_ocsp)\n   DOMAIN=${DOMAIN}\n   OCSPFILE=${OCSPFILE}\n   TIMESTAMP=${TIMESTAMP}\n"
+    f5_process_errors "DEBUG (hook function: deploy_ocsp)\n   DOMAIN=${DOMAIN}\n   OCSPFILE=${OCSPFILE}\n   TIMESTAMP=${TIMESTAMP}\n"
 }
 
 
 ## Function: unchanged_cert --> called by ACME client, check expire date of existing certificate
 unchanged_cert() {
     local DOMAIN="${1}" KEYFILE="${2}" CERTFILE="${3}" FULLCHAINFILE="${4}" CHAINFILE="${5}"
-    process_errors "DEBUG (hook function: unchanged_cert)\n   DOMAIN=${DOMAIN}\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n"
+    f5_process_errors "DEBUG (hook function: unchanged_cert)\n   DOMAIN=${DOMAIN}\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n"
 }
 
 
 ## Function: invalid_challenge --> called by ACME client, triggered when the challenge request status has failed (is invalid)
 invalid_challenge() {
     local DOMAIN="${1}" RESPONSE="${2}"
-    process_errors "DEBUG (hook function: invalid_challenge)\n   DOMAIN=${DOMAIN}\n   RESPONSE=${RESPONSE}\n"
+    f5_process_errors "DEBUG (hook function: invalid_challenge)\n   DOMAIN=${DOMAIN}\n   RESPONSE=${RESPONSE}\n"
 }
 
 
 ## Function: request_failure --> called by ACME client...
 request_failure() {
     local STATUSCODE="${1}" REASON="${2}" REQTYPE="${3}" HEADERS="${4}"
-    process_errors "DEBUG (hook function: request_failure)\n   STATUSCODE=${STATUSCODE}\n   REASON=${REASON}\n   REQTYPE=${REQTYPE}\n   HEADERS=${HEADERS}\n"
+    f5_process_errors "DEBUG (hook function: request_failure)\n   STATUSCODE=${STATUSCODE}\n   REASON=${REASON}\n   REQTYPE=${REQTYPE}\n   HEADERS=${HEADERS}\n"
 }
 
 
 ## Function: generate_csr --> called by ACME client, triggered when an external CSR is passed in
 generate_csr() {
     local DOMAIN="${1}" CERTDIR="${2}" ALTNAMES="${3}"
-    process_errors "DEBUG (hook function: generate_csr)\n   DOMAIN={DOMAIN}\n   CERTDIR=${CERTDIR}\n   ALTNAMES=${ALTNAMES}\n"
+    f5_process_errors "DEBUG (hook function: generate_csr)\n   DOMAIN={DOMAIN}\n   CERTDIR=${CERTDIR}\n   ALTNAMES=${ALTNAMES}\n"
 }
 
 
 ## Function: exit_hook --> called by ACME client when ACME challenge process is complete
 exit_hook() {
     local ERROR="${1:-}"
-    process_errors "DEBUG (hook function: exit_hook)\n   ERROR=${ERROR}\n"
+    f5_process_errors "DEBUG (hook function: exit_hook)\n   ERROR=${ERROR}\n"
 }
 
 
