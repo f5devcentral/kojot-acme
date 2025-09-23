@@ -104,3 +104,39 @@ This section describes the setup and configuration of local ACME services for te
 
   
 </details>
+
+<details>
+<summary><b>Testing DNS-01 Validation Locally</b></summary>
+
+This project includes a ```docker-compose-combined.yaml``` compose that deploys both ACME servers (Smallstep and Pebble), and a local DNS server instance preconfigured to support RFC2136 API support for Bind. To begin, copy the **dns_nsupdate.sh** and **dns_ndsupdate_creds.ini** files from the repo dnsapi folder into the /shared/acme/dnsapi folder on the BIG-IP. In your ```config``` file, ensure that **ACME_METHOD** is set to ```"dns-01"```, and then add the following entries:
+
+```
+DNSAPI=dns_nsupdate
+NSUPDATE_SERVER="192.168.100.53"
+NSUPDATE_SERVER_PORT=53
+NSUPDATE_KEY="/shared/acme/dnsapi/dns_nsupdate_creds.ini"
+```
+
+Clone the repository on your Linux server with Docker installed:
+
+```
+git clone https://github.com/kevingstewart/f5acmehandler-bash.git
+cd f5acmehandler-bash/acme-servers/
+```
+
+Edit the compose file as required to ensure interface and IP addresses are accessible to the BIG-IP, then start the compose environment:
+
+```
+docker-compose -f docker-compose-combined.yaml up -d
+```
+
+Update the ```dg_acme_config``` data group on the BIG-IP to assert a certificate name and either Smallstep or Pebble ACME servers. Then test from the BIG-IP console:
+
+```
+cd /shared/acme
+./f5acmehandler.sh --verbose --force
+```
+
+The ```dns_nsupdate_creds.ini``` is preconfigured to match the keys in the Bind9 rndc key settings.
+
+</details>
