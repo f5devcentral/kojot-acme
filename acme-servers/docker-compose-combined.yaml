@@ -1,0 +1,322 @@
+services:
+  pebble:
+    container_name: pebble
+    image: letsencrypt/pebble:latest
+    restart: unless-stopped
+    environment:
+      - "PEBBLE_ALTERNATE_ROOTS=1"
+      - "PEBBLE_VA_NOSLEEP=1"
+    dns: 192.168.100.53
+    ports:
+      - 14000:14000  # HTTPS ACME API
+      - 15000:15000  # HTTPS Management API
+    networks:
+      default: {}
+      webserver-net:
+        ipv4_address: 192.168.100.20
+    depends_on:
+      bind9:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ## Generate config.json file
+        mkdir /configs
+        cat > "/configs/config.json" << 'EOF'
+        {
+          "pebble": {
+            "listenAddress": "0.0.0.0:14000",
+            "managementListenAddress": "0.0.0.0:15000",
+            "certificate": "/configs/ca-cert.pem",
+            "privateKey": "/configs/ca-key.pem",
+            "httpPort": 80,
+            "tlsPort": 5001,
+            "ocspResponderURL": "",
+            "externalAccountBindingRequired": false,
+            "domainBlocklist": ["blocked-domain.example"],
+            "retryAfter": {
+              "authz": 3,
+              "order": 5
+            }
+          }
+        }
+        EOF
+        
+        ## Import ca cert (subrsa.f5labs.com)
+        cat > "/configs/ca-cert.pem" << 'EOF'
+        -----BEGIN CERTIFICATE-----
+        MIID1jCCAr6gAwIBAgIBAjANBgkqhkiG9w0BAQsFADBXMQswCQYDVQQGEwJVUzET
+        MBEGA1UEChMKZjVsYWJzLmNvbTEeMBwGA1UECxMVQ2VydGlmaWNhdGUgQXV0aG9y
+        aXR5MRMwEQYDVQQDEwpmNWxhYnMuY29tMB4XDTE5MDIyNzEwNTE0OFoXDTMwMDUx
+        NjEwNTE0OFowXjELMAkGA1UEBhMCVVMxEzARBgNVBAoTCmY1bGFicy5jb20xHjAc
+        BgNVBAsTFVN1Ym9yZGluYXRlIEF1dGhvcml0eTEaMBgGA1UEAxMRc3VicnNhLmY1
+        bGFicy5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC3H/VTyUNC
+        vkqjxci3ypX3/QeIehFnxOj1qO09a0n91MvWBCgK4gM1hyEJ9nME6cVMu9bYGnJv
+        FA9rZwXGenwJ1LFkHBq94a6NSFcdcFawFek/qpJS4Q93jGTHtlQvZc77JxGn+aSv
+        1tSrw60v3t9UkQRCbCUp+DmBauKXmBt6s4Vg7Yc1Ot41tTs3Xv9Nc7TVonCjSms/
+        T3tOBX7/OWyvGU3kWWMiRKaGJFzMrQimELJFwC64K8NHKKKvdv029BuH8X8TluqG
+        yMZHlDam9s9pJqXIeZsDT+JGgppffvNMZfiWFEyNaj3hdVHE2WRLUh6eFli6PigJ
+        yG0h/Qz6r58lAgMBAAGjgaUwgaIwQgYJYIZIAYb4QgENBDUWM09wZW5TU0wgZ2Vu
+        ZXJhdGVkIHN1Ym9yZGluYXRlIGF1dGhvcml0eSBjZXJ0aWZpY2F0ZTALBgNVHQ8E
+        BAMCAYYwHQYDVR0OBBYEFKI+o3qMQR2u/xMNWuL1DGf/eIKyMB8GA1UdIwQYMBaA
+        FEoQGb5szH9/+K832NzHSZ1bJtC+MA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcN
+        AQELBQADggEBAAVlXhDW/LCLrJOjW0/x9ej83q4kHLWJYuLZl/SGe2KnyIknqkX1
+        Z0Vs+qs2wTtdJELsjWu+0WmwAaDHQzhpLV7lu+jRl0td1QeJoKnFbA/uTBIKKY3d
+        BfQUodywZ14bW/9cXUiUIye5dO9JGxNt+PVlgKdSYUU9D4mxOvjG0xuDyIDzD64d
+        J49hmhFTuqJRc0ps/Duqb0eaoDFITfNAgqBkUeWw4dsjYrTKpGVkrl2dWtk3GCFX
+        fpgc8qGDAmuq8Dt2O+2J1yNCDFx79OH+furhh5EUvNI5BiPy1zjrwz/W/JlOc0vg
+        GBlq13rqHWMmX8DV1xgSwS3oRdrsgr8p6hs=
+        -----END CERTIFICATE-----
+        EOF
+
+        ## Import ca key (subrsa.f5labs.com)
+        cat > "/configs/ca-key.pem" << 'EOF'
+        -----BEGIN RSA PRIVATE KEY-----
+        MIIEogIBAAKCAQEAtx/1U8lDQr5Ko8XIt8qV9/0HiHoRZ8To9ajtPWtJ/dTL1gQo
+        CuIDNYchCfZzBOnFTLvW2BpybxQPa2cFxnp8CdSxZBwaveGujUhXHXBWsBXpP6qS
+        UuEPd4xkx7ZUL2XO+ycRp/mkr9bUq8OtL97fVJEEQmwlKfg5gWril5gberOFYO2H
+        NTreNbU7N17/TXO01aJwo0prP097TgV+/zlsrxlN5FljIkSmhiRczK0IphCyRcAu
+        uCvDRyiir3b9NvQbh/F/E5bqhsjGR5Q2pvbPaSalyHmbA0/iRoKaX37zTGX4lhRM
+        jWo94XVRxNlkS1IenhZYuj4oCchtIf0M+q+fJQIDAQABAoIBADWsl1KUljNU5Tm1
+        egxsw6IpNvEInltk+scuWUL8VHaizZAQLdBqyHgDAGsUIkhZYKwKDoHO1qW6In7f
+        dnDja8HR5qCqIChxoqDkiCwnxjDcaz5u9251avwmWU+0IF64H3+7xtAOOvgTJsil
+        lPiIAbueubniSs5PZEOLmZjHS56dyngtKUEMVXS1LQiSYGGTHk5VXL6T4zeaEB0D
+        ofVhdqvYNsS0+3JsaPcGk0ou3wwTSOsWngBqakcByWH/1qvbEC9EqozYliVY2ICk
+        T7MvmP37Y7AEt9ufRWBZ2T8bvVztiBUD3I+ieYQlYGKoxHONYlukJsXt31Cx/2WI
+        wO/xSaECgYEA6dWgzIGSLmxDAnOUUNIv9MuEuz5tcAlxwstxliF4TPvEvhq1laOC
+        nplZ0n6pJxSEfpHeUPASMZJIhjAJTFAIghCDVhioVctKTBqbUXY8qW2cZv8RaECh
+        CQQo6WVRoD84Awm3EpQyhW5WgzFY1+LmA1tQIAgZhS2hPXU8kbIz7U0CgYEAyHvH
+        UcZcwWsHV4pYtX4A3PQJmNJPZaW3cvtMQ3oWvIC+Ar+HJb3gfdLqhWPoz40QugIQ
+        ruWB2ClF+naW9MEaAPymXOHjd1+rqHesTMnZ9S80PJUUWI0zHrmZHssDPplNSoBN
+        zKGogXDGtTNwP3rNct9tauXeySC3fZ4riCJubTkCgYB76YnpdWwqj5I+9VKONaPW
+        HBc9RkqmCUswh7CsdxYR7YUHnI3HOzuXofn4Ush+fh/sFo5x45YwkK0/9qqmtu6b
+        RfbjI/Poau73P045L+fbfMtZxSbLURxE8+BeNiO4QGgFLBvIi6HuFVdg9EB5PrLW
+        6oeeQcyMR27fa4XqSz27LQKBgDq4HkHyQlqYOXdHWwIVXLVaeLEc8ApKhjeUKNse
+        mCgv4Pc3F6NTQLw5mVzmTVr06zA/yJkhOW2RcSCRuVcIc9BUL3nG43OkPsfB/WIk
+        QMVSRQ91bpcdDBr0q0dcmJ+uEPhAKglEU/FNkbWi0j6VfjUmAYsstprcDUIqoH9n
+        7kXpAoGAU+KHZNtlO6CghVYwANDyo0x4lZQH1zgHgkrnkWqiEIiNzz6YUasjUgJl
+        zwr9fcEOy+fnddruBAx5YWJGuvssXp5lgvH1bu4rljhkTz6ee05Cog80p8LPmvlo
+        REs4Qps547E/ICMEmxln7dj+T0RtvXfGlrt+DioD3YF/ciXAA7M=
+        -----END RSA PRIVATE KEY-----
+        EOF
+
+        ## Start Pebble Acme server
+        pebble -config /configs/config.json -strict
+        
+        # tail -f /dev/null
+
+  
+  step-ca:
+    container_name: smallstep
+    image: smallstep/step-ca
+    restart: unless-stopped
+    user: 0:0
+    dns: 192.168.100.53
+    ports:
+      - '9000:9000'
+    networks:
+      default: {}
+      webserver-net:
+        ipv4_address: 192.168.100.30
+    depends_on:
+      bind9:
+        condition: service_healthy
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ## Generate password file
+        echo '{m2*F!fhAsY6sP&*=lLtYMIu)J_T6kVH█' > /home/step/password.txt
+
+        ## Import rootca key (f5labs.com)
+        cat > "/home/step/rootca.key" << 'EOF'
+        -----BEGIN RSA PRIVATE KEY-----
+        MIIEowIBAAKCAQEAuSFJGHLO3pHhFjBkIdnYO0MYtWkG+0YZp54ldzts41A5vUww
+        ZIVggf1CtL69YiCWrllnkHADNQFORFChFthC5m6uwwSmxI4UnJ1+HmS0+vYyofNg
+        uMt0W0lnDYTq5ZXrkBN5/yKiQX1rDUxYQaEbiCRsO4wkCD1Cz0ydZ+NAr6kkUfIn
+        NMQwvl3K1+cYtDxvgb/IEvVS8NhBYPc37qmfRq3Iuf+D84Enj4vXty+0scXiWfxG
+        zUlCk26twyIEb7jGaLR/XZsmU8bwGMjrizs1KzVccz94LydpApMHFreDW243/Xge
+        knBIv0lDSk1S69TRmA4Dd4JZhLzLgxh6DM3IowIDAQABAoIBAAVaYAmz8CVhZHfG
+        yG5uJSF5jDJaqhgD6+P736t17W0ZOcIufMu7S5IWp6IgTcuTk6fQ7/yuMHmM4x14
+        k1/cuvp8wtLixIu0bAYnS6lHUjBbhBVIu0g8oc2t7qvmZwBieGA/H+zvrG9mV/0X
+        cwnaxbgHDZYfND+EvfTOi1KgsJMjrUWszc51RVQ90wKXdaBhqywLA2/GumJg4EFi
+        lodw2J/Wbr+dGfquf8rdsLA1nwwPPMkYMJ2AHLEKEumkelUePiepYqvXOtsJqigI
+        4LdCaKDQJjzyeMBqbjv4dejbb6IjHz4eeYFV9QjYpzvyom4G6K96nIK7OoXspUwL
+        Zd6J3NECgYEA7OcLidHbBx+WwWbomdTFFXquJQxe/hzESZN+w1Tt73dOvqj36G3J
+        sqfC9/LtUfPkcLtersoiTAyhM7GQoVS4vsfzIzXjZltq0xDWXWDo42Sz7dD3NooU
+        /Xo0NiqTHoONPLNDQdqwS2PAVZCXvsc7VJ9MLUbbplFTimPaO4NoJTkCgYEAyA3P
+        2q7Sfu3rv31b8zV67KRKlLv+d0M5TY0NeVMqDGQZqGN00S7sNrauUjQS7wK9QpAH
+        aQrBE9I3QrgVgsWLReseQi/WL8pbrpDtL3JxrRFgdnTLm1yAs+NUKPWv4MfV/ODf
+        ZkR0JyCtQfEdaeegjUP2qMCx4Ndj9LOdoZFnWLsCgYBjmSuHsNvV3dkCzKIj8ok9
+        Y4uNdesGCNAZYtJbivxRviY0EFPRuz6eRtu4ZMCTwOcc4hmHgOH0eSbY1eFJgpX9
+        V5EID6LgKLT7sct+DL08xNzEsiMNIfZ7LwJ+d13M6V/a0j8Hk8qkl3aIQrcZdSej
+        hyl+q5izDuQBfcOFW9TQOQKBgQDFqF/lwTVZE9oJqOJgukZp6SmHKveQ/mpvpR3a
+        8cBp3b08Eogo5iOdK4Gw1qKeZCZ6zbOEpYt++gR/d0JJosSooFWVL46ASX+sSqUO
+        bBTE2pZkc6F4Lz06fzF4BsdvYAKdh9EyShA5WJ/Wt1RIfwKykKP0t+8IJ8gqzgzA
+        xdlGYQKBgDY9qObGV+3RXMZLUuyurZoiRCvrSpUwz84LxMBX9GO+p+RKZ2JFR7Uv
+        /dAejO3FWHBCYbblpM57/LfFzByISqOlDlEOUMO6zMKMa+libHrPsOJ4/b6n6PaR
+        yq2Hh8HxRgiLu6lybMPfN1VH6/3Fg82nKtiPBN4Xt22/XWiHtBbf
+        -----END RSA PRIVATE KEY-----
+        EOF
+
+        ## Import rootca cert (f5labs.com)
+        cat > "/home/step/rootca.crt" << 'EOF'
+        -----BEGIN CERTIFICATE-----
+        MIIDoTCCAomgAwIBAgIJAL859gCV8N/6MA0GCSqGSIb3DQEBCwUAMFcxCzAJBgNV
+        BAYTAlVTMRMwEQYDVQQKEwpmNWxhYnMuY29tMR4wHAYDVQQLExVDZXJ0aWZpY2F0
+        ZSBBdXRob3JpdHkxEzARBgNVBAMTCmY1bGFicy5jb20wHhcNMTkwMjI3MTA0NjAw
+        WhcNMzAwNTE2MTA0NjAwWjBXMQswCQYDVQQGEwJVUzETMBEGA1UEChMKZjVsYWJz
+        LmNvbTEeMBwGA1UECxMVQ2VydGlmaWNhdGUgQXV0aG9yaXR5MRMwEQYDVQQDEwpm
+        NWxhYnMuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuSFJGHLO
+        3pHhFjBkIdnYO0MYtWkG+0YZp54ldzts41A5vUwwZIVggf1CtL69YiCWrllnkHAD
+        NQFORFChFthC5m6uwwSmxI4UnJ1+HmS0+vYyofNguMt0W0lnDYTq5ZXrkBN5/yKi
+        QX1rDUxYQaEbiCRsO4wkCD1Cz0ydZ+NAr6kkUfInNMQwvl3K1+cYtDxvgb/IEvVS
+        8NhBYPc37qmfRq3Iuf+D84Enj4vXty+0scXiWfxGzUlCk26twyIEb7jGaLR/XZsm
+        U8bwGMjrizs1KzVccz94LydpApMHFreDW243/XgeknBIv0lDSk1S69TRmA4Dd4JZ
+        hLzLgxh6DM3IowIDAQABo3AwbjAvBglghkgBhvhCAQ0EIhYgT3BlblNTTCBnZW5l
+        cmF0ZWQgQ0EgY2VydGlmaWNhdGUwHQYDVR0OBBYEFEoQGb5szH9/+K832NzHSZ1b
+        JtC+MA8GA1UdEwEB/wQFMAMBAf8wCwYDVR0PBAQDAgGGMA0GCSqGSIb3DQEBCwUA
+        A4IBAQCBGj/nKgjS4JjKt6GvPbVEiTBwv2WBejJ97ozCMkdWCmMEESJ9lkVruIOI
+        BbfXxOXHSxhXPrQXQjCy0zPXG1beZSHhk1mKUoWK+JqMyxoNAQkDfLsdd34TApHW
+        kIItc4nxmGM4RoKWxqzAxsYr0e0fvHwiPoqvebNrVtxcdm7Zltng3l2O6uM/DiT/
+        IUa9IcD0LNAxOA0qF1GTJkglbjwRHEpNSfO0qg5WEfUEOHLi2M0aB3v7lZXmU6q4
+        Gt5YRbIFCDf25i+I4yqXWER5iyZgee7WNyiz3UJpasx5eZRqtK/FGFK9hKK9/35H
+        BrdlmzkznKUvswZmcvR7nXbxI5qv
+        -----END CERTIFICATE-----
+        EOF
+
+        ## Trigger step ca init
+        /usr/local/bin/step ca init \
+        --name=Smallstep \
+        --dns=localhost \
+        --dns=smallstep.f5labs.com \
+        --acme=true \
+        --deployment-type=standalone \
+        --address=:9000 \
+        --provisioner-password-file=/home/step/password.txt \
+        --password-file=/home/step/password.txt \
+        --provisioner="admin@f5labs.com" \
+        --root=/home/step/rootca.crt \
+        --key=/home/step/rootca.key
+       
+        ## Overwrite minted ECDSA intermediate cert/key with RSA cert/key
+        /usr/local/bin/step certificate create subca.f5labs.com \
+        /home/step/certs/intermediate_ca.crt \
+        /home/step/secrets/intermediate_ca_key \
+        --kty RSA \
+        --profile intermediate-ca \
+        --ca /home/step/certs/root_ca.crt \
+        --ca-key /home/step/rootca.key \
+        --no-password --insecure -f
+
+        ## Pause for 5 seconds
+        sleep 5
+
+        ## Start step-ca server
+        /usr/local/bin/step-ca --password-file /home/step/password.txt /home/step/config/ca.json
+
+  
+  bind9:
+    container_name: bind9
+    image: ubuntu/bind9:9.18-22.04_beta
+    restart: unless-stopped
+    networks:
+      default: {}
+      webserver-net:
+        ipv4_address: 192.168.100.53
+    healthcheck:
+      test: dig www.example.com  | grep -c "ANSWER SECTION" || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 20
+      start_period: 10s
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ## Install and start ssh server
+        apt update
+        apt install dnsutils openssh-server -y
+
+        ## Make some directories
+        mkdir -p /etc/bind
+        mkdir -p /var/cache/bind
+        mkdir -p /var/lib/bind
+        mkdir -p /var/run/sshd
+
+        ## Create SSH config
+        useradd -m --no-log-init --system  --uid 1000 bob -s /bin/bash -g sudo -G root
+        echo 'bob:bob' | chpasswd
+        /usr/sbin/sshd -D &
+
+        ## Create named.conf
+        cat > "/etc/bind/named.conf" << 'EOF'
+        options {
+                directory "/var/cache/bind";
+                recursion yes;
+                allow-query { any; };
+                listen-on { any; };
+                listen-on-v6 { any; };
+                forwarders {
+                      10.1.1.1;
+                };
+        };
+        key "rndc-key" {
+              algorithm hmac-sha256;
+              secret "HU5Owk1hw5MgKfcddBuvGLtwVB/GdqjkR6FJLrhIKtQ=";
+        };
+        zone "f5labs.com" {
+                type primary;
+                file "/var/lib/bind/db.f5labs.com";
+                update-policy {
+                      grant rndc-key zonesub any;
+                      grant * self . TXT;
+                };
+        };
+        EOF
+
+        ## Create f5labs.com zone file
+        cat > "/var/lib/bind/db.f5labs.com" <<'EOF'
+        $$TTL 5 ;
+        $$ORIGIN f5labs.com.
+
+        @       IN      SOA     ns.     hostmaster (
+        2003080801 ; serial number
+        12h        ; refresh
+        15m        ; update retry
+        3w         ; expiry
+        2h         ; minimum
+        )
+
+        ; ns entry
+        @                IN      NS      ns.
+        @                IN      A       192.168.100.53
+
+        ; wildcard entry for anything *.f5labs.com
+        pebble           IN      A       192.168.100.20
+        smallstep        IN      A       192.168.100.30
+        www              IN      A       192.168.100.10
+        foo              IN      A       192.168.100.11
+        bar              IN      A       192.168.100.12
+        EOF
+
+        ## Perform additional tweaks
+        chmod -R 777 /var/lib/bind/
+
+        ## Start named
+        /usr/local/bin/docker-entrypoint.sh
+
+
+networks:
+  default:
+    driver: bridge
+
+  webserver-net:
+    driver: macvlan
+    driver_opts:
+      parent: ens6.80
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.100.0/24
