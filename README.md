@@ -865,5 +865,14 @@ Special thanks to:
 
 </details>
 
+<details>
+<summary><b>Updates: 2025 September 23</b></summary>
+
+* Added dns_ionos.sh script (dnsapi folder) to support IONOS for dns-01 validation.
+* Updated f5acmehandler.sh and f5hook.sh to properly export the f5_process_errors function.
+
+</details>
+
+
 <br />
 <br />
