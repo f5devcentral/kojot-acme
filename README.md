@@ -205,8 +205,14 @@ where:
     4. month (1-12)
     5. day of the week (0-6)
 
-```
+```bash
 ./f5acmehandler.sh --schedule "00 04 * * 1"
+```
+
+To unschedule, run the following command:
+
+```bash
+crontab -l |grep -v f5acmehandler | crontab
 ```
 
 </details>
