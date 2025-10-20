@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250923-1
+## Version: 20251020-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -80,9 +80,10 @@ export CREATEPROFILE=false
 export WELLKNOWN="/tmp/wellknown"
 export ORDER_TIMEOUT=0
 export VALIDATION_TIMEOUT=0
+export CERT_OCSP=""
+export CERT_ISSUER=""
 export REPORT
 export VERBOSE="no"
-
 
 ## Function: process_errors --> print error and debug logs to the log file
 f5_process_errors() {
@@ -346,6 +347,39 @@ f5_process_handler_config() {
       ALIAS=$(echo "$COMMAND" | sed -E 's/.*(--alias+\s[^[:space:]]+).*/\1/g;s/"//g;s/--alias //g')
    else
       ALIAS="${DOMAIN}"
+   fi
+
+   ## Validation check: Does --ocsp exist without --issuer, and vice-versa
+   if [[ (("$COMMAND" =~ "--ocsp ") && !("$COMMAND" =~ "--issuer ")) || (("$COMMAND" =~ "--issuer ") && !("$COMMAND" =~ "--ocsp ")) ]]
+   then
+      f5_process_errors "PANIC: Configuration contains either an --ocsp option or --issuer option. Both are required when one is set."
+      echo "    PANIC: Configuration contains either an --ocsp option or --issuer option. Both are required when one is set." >> ${REPORT}
+      continue
+   elif [[ (("$COMMAND" =~ "--ocsp ") && ("$COMMAND" =~ "--issuer ")) ]]
+   then
+      CERT_OCSP=$(echo "$COMMAND" | sed -E 's/.*(--ocsp+\s[^[:space:]]+).*/\1/g;s/"//g;s/--ocsp //g')
+      CERT_ISSUER=$(echo "$COMMAND" | sed -E 's/.*(--issuer+\s[^[:space:]]+).*/\1/g;s/"//g;s/--issuer //g')
+
+      ## Remove --issuer and --ocsp from COMMAND
+      COMMAND=$(echo $COMMAND | sed -E 's/(.*)--ocsp+\s[^[:space:]]+(.*)/\1\2/g;s/(.*)--issuer+\s[^[:space:]]+(.*)/\1\2/g;s/[[:space:]]+/ /g')
+
+      ## Now check if either ocsp config object or issuer certificate are missing
+      ocspexists=true && [[ "$(tmsh list sys crypto cert-validator ocsp ${CERT_OCSP} 2>&1)" =~ "was not found" ]] && ocspexists=false
+      issuerexists=true && [[ "$(tmsh list sys crypto cert ${CERT_ISSUER} 2>&1)" == "" ]] && issuerexists=false
+
+      if [[ "$ocspexists" == "false" ]]
+      then
+         f5_process_errors "PANIC: Configuration contains --ocsp option that points to an OCSP object that does not exist."
+         echo "    PANIC: Configuration contains --ocsp option that points to an OCSP object that does not exist." >> ${REPORT}
+         continue
+      fi
+
+      if [[ "$issuerexists" == "false" ]]
+      then
+         f5_process_errors "PANIC: Configuration contains --issuer option that points to a certificate that does not exist."
+         echo "    PANIC: Configuration contains --issuer option that points to a certificate that does not exist." >> ${REPORT}
+         continue
+      fi
    fi
 
    ## Validation check: Config entry must include "--ca" option
