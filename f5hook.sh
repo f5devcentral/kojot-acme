@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Hook Script
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20250923-1
+## Version: 20251020-1
 ## Description: ACME client hook script used for staging ACME http-01 challenge response, then cleanup
 
 
@@ -134,6 +134,13 @@ clean_challenge() {
 
 ## Function deploy_cert --> called by ACME client to install/replace the renewed certificate and private key on the BIG-IP
 deploy_cert() {
+    if [[ (-n "$CERT_ISSUER") && (-n $CERT_OCSP) ]]
+    then
+        CERT_OCSP_TXT="cert-validation-options { ocsp } cert-validators replace-all-with { ${CERT_OCSP} } issuer-cert ${CERT_ISSUER}"
+    else
+        CERT_OCSP_TXT="cert-validation-options none cert-validators none issuer-cert none"
+    fi
+
     ## Import new cert and key
     local DOMAIN="${1}" KEYFILE="${2}" CERTFILE="${3}" FULLCHAINFILE="${4}" CHAINFILE="${5}" TIMESTAMP="${6}"
     f5_process_errors "DEBUG (hook function: deploy_cert)\n   DOMAIN=${DOMAIN}\n   KEYFILE=${KEYFILE}\n   CERTFILE=${CERTFILE}\n   FULLCHAINFILE=${FULLCHAINFILE}\n   CHAINFILE=${CHAINFILE}\n   TIMESTAMP=${TIMESTAMP}\n"
@@ -155,7 +162,7 @@ deploy_cert() {
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
             echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-             echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem
+             echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem ${CERT_OCSP_TXT}
             echo submit cli transaction
             ) | tmsh
         else
@@ -164,7 +171,7 @@ deploy_cert() {
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
             echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-            echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem
+            echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem ${CERT_OCSP_TXT}
             echo submit cli transaction
             ) | tmsh
         fi
@@ -175,12 +182,12 @@ deploy_cert() {
             f5_process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
             tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem
+            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem ${CERT_OCSP_TXT}
         else
             f5_process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
             tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem
+            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem ${CERT_OCSP_TXT}
         fi
     fi
 
