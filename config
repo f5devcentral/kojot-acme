@@ -21,7 +21,7 @@ CURL_OPTS="--http1.1 -k"
 KEY_ALGO=rsa
 
 # Default keysize for private keys (default: 4096)
-KEYSIZE="2048"
+#KEYSIZE="2048"
 
 # E-mail to use during the registration (default: <unset>)
 CONTACT_EMAIL=admin@f5labs.com
