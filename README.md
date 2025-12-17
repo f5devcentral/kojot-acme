@@ -890,6 +890,13 @@ Special thanks to:
 
 </details>
 
+<details>
+<summary><b>Updates: 2025 December 17</b></summary>
+
+* Updated Dehydrated client in accordance with origin updates: https://github.com/dehydrated-io/dehydrated/commit/1dbbc64ce947af000b764e806429e3f87cb3a55e
+
+</details>
+
 
 <br />
 <br />
