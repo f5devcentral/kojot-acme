@@ -6,7 +6,8 @@
 # This script is licensed under The MIT License (see LICENSE for more information).
 
 ## UPDATED TO ADDRESS KOJOT ACME INTEGRATION SUPPORT (search for "KOJOT UPDATE" in script)
-## Version: 20250801-1
+## UPDATED TO ADD OCT24 dehydrated-io updates (line 1960): https://github.com/dehydrated-io/dehydrated/commit/1dbbc64ce947af000b764e806429e3f87cb3a55e
+## Version: 20251217-01
 
 set -e
 set -u
@@ -701,7 +702,6 @@ init_system() {
   fi
 
   ## KOJOT UPDATE to address EC key type support (Kojot issue 21)
-  ## if ("${OPENSSL}" rsa -in "${ACCOUNT_KEY}" -check 2>/dev/null > /dev/null); then
   if ("${OPENSSL}" rsa -in "${ACCOUNT_KEY}" 2>/dev/null > /dev/null); then
     # Get public components from private key and calculate thumbprint
     pubExponent64="$(printf '%x' "$("${OPENSSL}" rsa -in "${ACCOUNT_KEY}" -noout -text | awk '/publicExponent/ {print $2}')" | hex2bin | urlbase64)"
@@ -1957,7 +1957,7 @@ command_sign_domains() {
       valid="$("${OPENSSL}" x509 -enddate -noout -in "${cert}" | cut -d= -f2- )"
 
       printf " + Valid till %s " "${valid}"
-      if ("${OPENSSL}" x509 -checkend $((RENEW_DAYS * 86400)) -noout -in "${cert}" > /dev/null 2>&1); then
+      if ("${OPENSSL}" x509 -checkend $((RENEW_DAYS * 86400)) -noout -in "${cert}" 2>&1 | grep -q "will not expire"); then
         printf "(Longer than %d days). " "${RENEW_DAYS}"
         if [[ "${force_renew}" = "yes" ]]; then
           echo "Ignoring because renew was forced!"
