@@ -8,6 +8,7 @@
 ##  AWS_ACCESS_KEY_ID API Key ID
 ##  AWS_SECRET_ACCESS_KEY API Secret
 ##  AWS_SESSION_TOKEN Session Token
+##  AWS_DNS_SLOWRATE (optional) Sleep interval after TXT record update, in seconds (default: 1)
 
 dns_aws_info='Amazon AWS Route53 domain API
 Site: docs.aws.amazon.com/route53/
@@ -16,6 +17,7 @@ Options:
  AWS_ACCESS_KEY_ID API Key ID
  AWS_SECRET_ACCESS_KEY API Secret
  AWS_SESSION_TOKEN Session Token
+ AWS_DNS_SLOWRATE (optional) Sleep interval after TXT record update, in seconds (default: 1)
 '
 
 # All `_sleep` commands are included to avoid Route53 throttling, see
