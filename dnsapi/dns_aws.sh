@@ -8,7 +8,7 @@
 ##  AWS_ACCESS_KEY_ID API Key ID
 ##  AWS_SECRET_ACCESS_KEY API Secret
 ##  AWS_SESSION_TOKEN Session Token
-##  AWS_DNS_SLOWRATE (optional) Sleep interval after TXT record update, in seconds (default: 1)
+##  AWS_DNS_SLOWRATE (optional) Sleep interval after TXT record update, in seconds (default: 10)
 
 dns_aws_info='Amazon AWS Route53 domain API
 Site: docs.aws.amazon.com/route53/
@@ -84,7 +84,7 @@ dns_aws_add() {
       f5_process_errors "DEBUG dns_aws (dns_aws_add): Slow rate activated: sleeping for $AWS_DNS_SLOWRATE seconds"
       _sleep "$AWS_DNS_SLOWRATE"
     else
-      _sleep 1
+      _sleep 10
     fi
 
     return 0
@@ -133,7 +133,7 @@ dns_aws_rm() {
       f5_process_errors "DEBUG dns_aws (dns_aws_rm): Slow rate activated: sleeping for $AWS_DNS_SLOWRATE seconds"
       _sleep "$AWS_DNS_SLOWRATE"
     else
-      _sleep 1
+      _sleep 10
     fi
 
     return 0
