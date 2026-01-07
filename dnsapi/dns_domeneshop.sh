@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 ## DNSAPI: domeneshop
 ## Gratuitously borrowed from github.com/acmesh-official/acme.sh/wiki/dnsapi2#dns_domeneshop and modified for local use
-## Maintainer:
+## Maintainer: kevin-at-f5-dot-com
 ## Version: 1
 ## Issues: https://github.com/f5devcentral/kojot-acme/issues
 ## Add the following information to your provider config file:
