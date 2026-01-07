@@ -12,6 +12,12 @@
 ##  AZUREDNS_MANAGEDIDENTITY Use Managed Identity. Use Managed Identity assigned to a resource instead of a service principal. "true"/"false"
 ##  AZUREDNS_BEARERTOKEN Bearer Token. Used instead of service principal credentials or managed identity. Optional.
 
+## Follow the wiki for instructions on setting up a service principal in Azure: https://github.com/acmesh-official/acme.sh/wiki/How-to-use-Azure-DNS
+## However, it is still required to separately add the role assignment to the resource group.
+## -- From the Azure WebUI, add the AcmeDnsValidator service principal to the resource group (Access Control (IAM) -> Role Assignments)
+## -- From the Azure CLI, you can use –scope for a resource group and object-id for principal to add role assignment:
+##    az role assignment create --role "DNS Zone Contributor" --scope "/subscriptions/<subscription id>/resourceGroups/<resource-group-name>" --assignee "<service principal object id>"
+
 dns_azure_info='Azure
 Site: Azure.microsoft.com
 Docs: github.com/acmesh-official/acme.sh/wiki/dnsapi#dns_azure
@@ -187,6 +193,9 @@ _azure_rest() {
     else
       f5_process_errors "DEBUG dns_azure (_azure_rest): GET"
       response="$(curl -sk -w "%{http_code}" -X GET -H "Accept: application/json" -H "$_H1" "$ep")"
+      if [ "$response" = "{\"value\":[]}" ]; then
+        f5_process_errors "ERROR dns_azure (_azure_getaccess_token): Azure returned empty dns zone list, check Azure IAM Role Assignments for resource group"
+      fi
     fi
     _ret="$?"
     _code=${response: -3}
