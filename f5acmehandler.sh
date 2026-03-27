@@ -260,7 +260,7 @@ f5_generate_cert_from_csr() {
    f5_process_errors "DEBUG (handler function: f5_generate_cert_from_csr)\n   DOMAIN=${DOMAIN}\n   COMMAND=${COMMAND}\n   ALIAS=${ALIAS}\n"
 
    ## Fetch existing subject-alternative-name (SAN) values from the certificate
-   certsan=$(tmsh list sys crypto cert ${ALIAS} | grep subject-alternative-name | awk '{$1=$1}1' | sed 's/subject-alternative-name//' | sed 's/IP Address:/IP:/')
+   certsan=$(tmsh list sys crypto cert "${ALIAS}" | grep subject-alternative-name | awk '{$1=$1}1' | sed 's/subject-alternative-name//' | sed 's/IP Address:/IP:/')
    ## If certsan is empty, assign the domain/CN value
    if [ -z "$certsan" ]
    then
@@ -268,16 +268,16 @@ f5_generate_cert_from_csr() {
    fi
 
    ## Commencing acme renewal process - first delete and recreate a csr for domain (check first to prevent ltm error log message if CSR doesn't exist)
-   csrexists=false && [[ "$(tmsh list sys crypto csr ${ALIAS} 2>&1)" =~ "${ALIAS}" ]] && csrexists=true
+   csrexists=false && [[ "$(tmsh list sys crypto csr "${ALIAS}" 2>&1)" =~ "${ALIAS}" ]] && csrexists=true
    if ($csrexists)
    then
-      tmsh delete sys crypto csr ${ALIAS} > /dev/null 2>&1
+      tmsh delete sys crypto csr "${ALIAS}" > /dev/null 2>&1
    fi
-   tmsh create sys crypto csr ${ALIAS} common-name ${DOMAIN} subject-alternative-name "${certsan}" key ${ALIAS}
+   tmsh create sys crypto csr "${ALIAS}" common-name "${DOMAIN}" subject-alternative-name "${certsan}" key "${ALIAS}"
    
    ## Dump csr to cert.csr in DOMAIN subfolder
-   mkdir -p ${ACMEDIR}/certs/${ALIAS} 2>&1
-   tmsh list sys crypto csr ${ALIAS} |sed -n '/-----BEGIN CERTIFICATE REQUEST-----/,/-----END CERTIFICATE REQUEST-----/p' > ${ACMEDIR}/certs/${ALIAS}/cert.csr
+   mkdir -p "${ACMEDIR}/certs/${ALIAS}" 2>&1
+   tmsh list sys crypto csr "${ALIAS}" |sed -n '/-----BEGIN CERTIFICATE REQUEST-----/,/-----END CERTIFICATE REQUEST-----/p' > "${ACMEDIR}/certs/${ALIAS}/cert.csr"
    f5_process_errors "DEBUG (handler: csr):\n$(cat ${ACMEDIR}/certs/${ALIAS}/cert.csr | sed 's/^/   /')\n"
 
    ## Trigger ACME client and dump renewed cert to certs/{domain}/cert.pem
@@ -312,15 +312,15 @@ f5_generate_cert_from_csr() {
 
    ## Create transaction to update existing cert and key
    (echo create cli transaction
-      echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem
+      echo install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/cert.pem"
       echo submit cli transaction
    ) | tmsh > /dev/null 2>&1
    f5_process_errors "DEBUG (handler: tmsh transaction) Installed certificate via tmsh transaction\n"
    echo "    Installed certificate via tmsh transaction." >> ${REPORT}
 
    ## Clean up objects
-   tmsh delete sys crypto csr ${ALIAS}
-   rm -rf ${ACMEDIR}/certs/${ALIAS}
+   tmsh delete sys crypto csr "${ALIAS}"
+   rm -rf "${ACMEDIR}/certs/${ALIAS}"
    f5_process_errors "DEBUG (handler: cleanup) Cleaned up CSR and ${ALIAS} folder\n\n"
 }
 
@@ -440,7 +440,7 @@ f5_process_handler_config() {
    f5_process_errors "DEBUG (handler function: f5_process_handler_config)\n   VAR: DOMAIN=${DOMAIN}\n   VAR: COMMAND=${COMMAND}\n"
 
    ## Error test: check if cert exists in BIG-IP config
-   certexists=true && [[ "$(tmsh list sys crypto cert ${ALIAS} 2>&1)" == "" ]] && certexists=false
+   certexists=true && [[ "$(tmsh list sys crypto cert "${ALIAS}" 2>&1)" == "" ]] && certexists=false
 
    if [[ "$ALWAYS_GENERATE_KEY" == "true" ]]
    then
@@ -465,7 +465,7 @@ f5_process_handler_config() {
          ## Certificate exists and is not expired. Check for FORCERENEW and collect today's date and certificate expiration date
          if [[ ! "${FORCERENEW}" == "yes" ]]
          then
-            date_cert=$(tmsh list sys crypto cert ${ALIAS} | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
+            date_cert=$(tmsh list sys crypto cert "${ALIAS}" | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
             date_cert=$(date -d "$date_cert" "+%Y%m%d")
             date_today=$(date +"%Y%m%d")
             date_test=$(( ($(date -d "$date_cert" +%s) - $(date -d "$date_today" +%s)) / 86400 ))
@@ -511,7 +511,7 @@ f5_process_handler_config() {
          ## Certificate exists and is not expired. Check for FORCERENEW and collect today's date and certificate expiration date
          if [[ ! "${FORCERENEW}" == "yes" ]]
          then
-            date_cert=$(tmsh list sys crypto cert ${ALIAS} | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
+            date_cert=$(tmsh list sys crypto cert "${ALIAS}" | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
             date_cert=$(date -d "$date_cert" "+%Y%m%d")
             date_today=$(date +"%Y%m%d")
             date_test=$(( ($(date -d "$date_cert" +%s) - $(date -d "$date_today" +%s)) / 86400 ))
