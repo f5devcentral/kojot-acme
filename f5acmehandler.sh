@@ -990,7 +990,7 @@ f5_main() {
 }
 
 ## Script entry
-REPORT=$(mktemp)
+REPORT=$(umask 077 && mktemp)
 echo "ACMEv2 Renewal Report: $(date)\n\n" > ${REPORT}
 f5_main "${@:-}"
 
