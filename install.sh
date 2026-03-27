@@ -57,6 +57,9 @@ process_install() {
         curl -s ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
     fi
 
+    ## Set restrictive permissions on config_reporting (contains SMTP credentials)
+    chmod 600 /shared/acme/config_reporting
+
     ## Delete dehydrated if it exists in the root path (upgrade)
     rm -f /shared/acme/dehydrated
 
