@@ -331,6 +331,12 @@ process_config_file
 
 ## Read command argument and call requested function
 HANDLER="$1"; shift
-if [[ "${HANDLER}" =~ ^(deploy_challenge|clean_challenge|sync_cert|deploy_cert|deploy_ocsp|unchanged_cert|invalid_challenge|request_failure|generate_csr|startup_hook|exit_hook)$ ]]; then
-    "$HANDLER" "$@"
-fi
+case "$HANDLER" in
+    deploy_challenge|clean_challenge|sync_cert|deploy_cert|deploy_ocsp|unchanged_cert|invalid_challenge|request_failure|generate_csr|startup_hook|exit_hook)
+        "$HANDLER" "$@"
+        ;;
+    *)
+        f5_process_errors "ERROR: Invalid handler: $HANDLER"
+        exit 1
+        ;;
+esac
