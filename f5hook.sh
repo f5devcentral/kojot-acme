@@ -205,10 +205,11 @@ deploy_cert() {
     # ALIAS is a directory name
     ## ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $5 }')" -- fix 22
     ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $(NF-1) }')"
+    [[ "$ALIAS" =~ ^[a-zA-Z0-9._-]+$ ]] || { f5_process_errors "ERROR: Invalid ALIAS: ${ALIAS}"; return 1; }
 
     ## Test if cert and key exist
-    key=true && [[ "$(tmsh list sys file ssl-key ${ALIAS} 2>&1)" =~ "was not found" ]] && key=false
-    cert=true && [[ "$(tmsh list sys file ssl-cert ${ALIAS} 2>&1)" =~ "was not found" ]] && cert=false
+    key=true && [[ "$(tmsh list sys file ssl-key "${ALIAS}" 2>&1)" =~ "was not found" ]] && key=false
+    cert=true && [[ "$(tmsh list sys file ssl-cert "${ALIAS}" 2>&1)" =~ "was not found" ]] && cert=false
 
     if ($key && $cert)
     then
@@ -218,8 +219,8 @@ deploy_cert() {
             f5_process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
-            echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-             echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem ${CERT_OCSP_TXT}
+            echo install sys crypto key "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/privkey.pem"
+             echo install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/fullchain.pem" ${CERT_OCSP_TXT}
             echo submit cli transaction
             ) | tmsh
         else
@@ -227,8 +228,8 @@ deploy_cert() {
             f5_process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
-            echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-            echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem ${CERT_OCSP_TXT}
+            echo install sys crypto key "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/privkey.pem"
+            echo install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/cert.pem" ${CERT_OCSP_TXT}
             echo submit cli transaction
             ) | tmsh
         fi
@@ -238,13 +239,13 @@ deploy_cert() {
             ## Create cert and key
             f5_process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
-            tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem ${CERT_OCSP_TXT}
+            tmsh install sys crypto key "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/privkey.pem"
+            tmsh install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/fullchain.pem" ${CERT_OCSP_TXT}
         else
             f5_process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
-            tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem ${CERT_OCSP_TXT}
+            tmsh install sys crypto key "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/privkey.pem"
+            tmsh install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/cert.pem" ${CERT_OCSP_TXT}
         fi
     fi
 
@@ -263,7 +264,7 @@ deploy_cert() {
         if [[ $clientssl == "false" ]]
         then
             ## Create the clientssl profile
-            tmsh create ltm profile client-ssl "${ALIAS}_clientssl" cert-key-chain replace-all-with { ${ALIAS} { key ${ALIAS} cert ${ALIAS} } }
+            tmsh create ltm profile client-ssl "${ALIAS}_clientssl" cert-key-chain replace-all-with { "${ALIAS}" { key "${ALIAS}" cert "${ALIAS}" } }
         fi
     fi
 
