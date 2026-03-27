@@ -794,16 +794,14 @@ f5_process_schedule() {
    testcron=$(echo "$CRON" | sed -E 's/^([[:digit:]\,\-\*\/]+)\s([[:digit:]\,\-\*\/]+)\s([[:digit:]\,\-\*\/]+)\s([[:digit:]\,\-\*\/]+)\s([[:digit:]\,\-\*\/]+)$/match/g')
    if [[ "$testcron" == "match" ]]
    then
-      ## Presumably correct cron string entered --> add to crontab
+      ## Reject shell metacharacters in cron string
+      if [[ "$CRON" =~ [;\&\|\$\`\(\)\>] ]]; then
+          printf "\nERROR: Cron string contains disallowed characters. No schedule applied.\n\n"
+          return 1
+      fi
 
-      ## Get current user
-      myuser=$(whoami)
-
-      ## Clear out any existing script entry
-      crontab -l |grep -v f5acmehandler | crontab
-
-      ## Write entry to bottom of the file
-      echo "${CRON} ${ACMEDIR}/f5acmehandler.sh" >> /var/spool/cron/${myuser}
+      ## Presumably correct cron string entered --> add to crontab via crontab API
+      (crontab -l 2>/dev/null | grep -v f5acmehandler; echo "${CRON} ${ACMEDIR}/f5acmehandler.sh") | crontab -
 
       printf "\nThe f5acmehandler script has been scheduled. Current crontab:\n\n"
       crontab -l | sed 's/^/   /'
