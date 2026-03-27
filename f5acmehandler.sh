@@ -561,7 +561,12 @@ f5_process_get_configs() {
       ifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_account_state 2>&1)" =~ "was not found" ]] && ifileexists=false
       if ($ifileexists)
       then
-         cat $(tmsh list sys file ifile f5_acme_account_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | base64 -d | tar xz
+         _ifile_data=$(cat $(tmsh list sys file ifile f5_acme_account_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//'))
+         if echo "$_ifile_data" | base64 -d | tar tz | grep -qE '(^|/)\.\.(/|$)'; then
+             f5_process_errors "PANIC: Malicious path detected in account state archive"
+             return 1
+         fi
+         echo "$_ifile_data" | base64 -d | tar xz
          ACCTSTATEEXISTS="yes"
          f5_process_errors "DEBUG Pulling acme account state information from iFile central storage\n"
       else
@@ -574,7 +579,12 @@ f5_process_get_configs() {
       ifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_dnsapi_state 2>&1)" =~ "was not found" ]] && ifileexists=false
       if ($ifileexists)
       then
-         cat $(tmsh list sys file ifile f5_acme_dnsapi_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | base64 -d | tar xz
+         _ifile_data=$(cat $(tmsh list sys file ifile f5_acme_dnsapi_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//'))
+         if echo "$_ifile_data" | base64 -d | tar tz | grep -qE '(^|/)\.\.(/|$)'; then
+             f5_process_errors "PANIC: Malicious path detected in dnsapi state archive"
+             return 1
+         fi
+         echo "$_ifile_data" | base64 -d | tar xz
          DNSAPISTATEEXISTS="yes"
          f5_process_errors "DEBUG Pulling acme dnsapi state information from iFile central storage\n"
       else
@@ -609,7 +619,12 @@ f5_process_get_configs() {
          confifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_config_state 2>&1)" =~ "was not found" ]] && confifileexists=false
          if ($confifileexists)
          then
-            cat $(tmsh list sys file ifile f5_acme_config_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | base64 -d | tar xz
+            _ifile_data=$(cat $(tmsh list sys file ifile f5_acme_config_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//'))
+            if echo "$_ifile_data" | base64 -d | tar tz | grep -qE '(^|/)\.\.(/|$)'; then
+                f5_process_errors "PANIC: Malicious path detected in config state archive"
+                return 1
+            fi
+            echo "$_ifile_data" | base64 -d | tar xz
             CONFSTATEEXISTS="yes"
             f5_process_errors "DEBUG Pulling acme config state information from iFile central storage\n"
          else
