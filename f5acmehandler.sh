@@ -810,7 +810,8 @@ f5_process_schedule() {
    if [[ "$testcron" == "match" ]]
    then
       ## Reject shell metacharacters in cron string
-      if [[ "$CRON" =~ [;\&\|\$\`\(\)\>] ]]; then
+      local _cron_bad_chars='[;&|$`()>]'
+      if [[ "$CRON" =~ $_cron_bad_chars ]]; then
           printf "\nERROR: Cron string contains disallowed characters. No schedule applied.\n\n"
           return 1
       fi
