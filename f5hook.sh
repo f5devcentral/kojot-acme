@@ -44,6 +44,8 @@ startup_hook() {
 ## Function: deploy_challenge --> called by ACME client to insert token into dg_acme_challenge data group for ACME server http-01 challenge
 deploy_challenge() {
     local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
+    [[ "$TOKEN_FILENAME" =~ ^[a-zA-Z0-9_-]+$ ]] || { f5_process_errors "ERROR: Invalid TOKEN_FILENAME"; return 1; }
+    [[ "$TOKEN_VALUE" =~ ^[a-zA-Z0-9_.-]+$ ]] || { f5_process_errors "ERROR: Invalid TOKEN_VALUE"; return 1; }
     f5_process_errors "DEBUG (hook function: deploy_challenge)\n   DOMAIN=${DOMAIN}\n   TOKEN_FILENAME=${TOKEN_FILENAME}\n   TOKEN_VALUE=${TOKEN_VALUE}\n"
 
     if [ "${ACME_METHOD}" == "http-01" ]
@@ -135,6 +137,7 @@ deploy_challenge() {
 clean_challenge() {
     ## Delete the record from the data group
     local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
+    [[ "$TOKEN_FILENAME" =~ ^[a-zA-Z0-9_-]+$ ]] || { f5_process_errors "ERROR: Invalid TOKEN_FILENAME"; return 1; }
     f5_process_errors "DEBUG (hook function: clean_challenge)\n   DOMAIN=${DOMAIN}\n   TOKEN_FILENAME=${TOKEN_FILENAME}\n   TOKEN_VALUE=${TOKEN_VALUE}\n"
     if [ "${ACME_METHOD}" == "http-01" ]
     then
