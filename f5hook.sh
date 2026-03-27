@@ -250,10 +250,10 @@ deploy_cert() {
     fi
 
     ## Clean up and zeroize local storage (via shred)
-    cd ${ACMEDIR}/certs/${ALIAS}
+    cd "${ACMEDIR}/certs/${ALIAS}" || { f5_process_errors "ERROR: Failed to cd to cert directory for ${ALIAS}"; return 1; }
     find . -type f -print0 | xargs -0 shred -fuz -n ${ZEROCYCLE}
-    cd ${ACMEDIR}/
-    rm -rf ${ACMEDIR}/certs/${ALIAS}/
+    cd "${ACMEDIR}/"
+    [[ -n "${ALIAS}" ]] && rm -rf "${ACMEDIR}/certs/${ALIAS}/"
 
 
     ## Test if corresponding clientssl profile exists

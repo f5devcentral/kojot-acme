@@ -320,7 +320,7 @@ f5_generate_cert_from_csr() {
 
    ## Clean up objects
    tmsh delete sys crypto csr "${ALIAS}"
-   rm -rf "${ACMEDIR}/certs/${ALIAS}"
+   [[ -n "${ALIAS}" ]] && rm -rf "${ACMEDIR}/certs/${ALIAS}"
    f5_process_errors "DEBUG (handler: cleanup) Cleaned up CSR and ${ALIAS} folder\n\n"
 }
 
