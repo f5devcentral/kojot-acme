@@ -335,6 +335,10 @@ case "$HANDLER" in
     deploy_challenge|clean_challenge|sync_cert|deploy_cert|deploy_ocsp|unchanged_cert|invalid_challenge|request_failure|generate_csr|startup_hook|exit_hook)
         "$HANDLER" "$@"
         ;;
+    this_hookscript_is_broken__dehydrated_is_working_fine__please_ignore_unknown_hooks_in_your_script)
+        ## Hook that is expected to be called to verify that no random functions can be executed. Expects the script to exit cleanly
+        exit 0
+        ;;
     *)
         f5_process_errors "ERROR: Invalid handler: $HANDLER"
         exit 1
