@@ -809,17 +809,17 @@ f5_process_handler_main() {
       ## Create wellknown folder
       mkdir -p /tmp/wellknown > /dev/null 2>&1
       
-      ## Read from the config data group and loop through keys:values
-      config=true && [[ "$(tmsh list ltm data-group internal ${DGCONFIG} 2>&1)" =~ "was not found" ]] && config=false
-      if ($config)
-      then
-         IFS=";" && for v in $(tmsh list ltm data-group internal ${DGCONFIG} one-line | sed -e 's/^.* records { //;s/ \} type string \}//;s/ { data /=/g;s/ \} /;/g;s/ \}//'); do f5_process_handler_config $v; done
-      else
-         f5_process_errors "PANIC: There was an error accessing the ${DGCONFIG} data group. Please re-install.\n"
-         echo "    PANIC: There was an error accessing the ${DGCONFIG} data group" >> ${REPORT}
-         f5_process_report "${REPORT}"
-         exit 1
-      fi
+      ## Read from the config data group(s) and loop through keys:values
+      for DG in ${DGCONFIG}; do
+         config=true && [[ "$(tmsh list ltm data-group internal ${DG} 2>&1)" =~ "was not found" ]] && config=false
+         if ($config)
+         then
+            IFS=";" && for v in $(tmsh list ltm data-group internal ${DG} one-line | sed -e 's/^.* records { //;s/ \} type string \}//;s/ { data /=/g;s/ \} /;/g;s/ \}//'); do f5_process_handler_config $v; done
+         else
+            f5_process_errors "PANIC: There was an error accessing the ${DG} data group. Please re-install.\n"
+            echo "    PANIC: There was an error accessing the ${DG} data group" >> ${REPORT}
+         fi
+      done
 
       ## Call process_put_configs to push local state data into central iFile store
       f5_process_put_configs
