@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20251020-1
+## Version: 20260508-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -84,6 +84,7 @@ export CERT_OCSP=""
 export CERT_ISSUER=""
 export REPORT
 export VERBOSE="no"
+export DEVICEHOOK=""
 
 ## Function: process_errors --> print error and debug logs to the log file
 f5_process_errors() {
@@ -809,11 +810,21 @@ f5_process_handler_main() {
       ## Create wellknown folder
       mkdir -p /tmp/wellknown > /dev/null 2>&1
       
+      ## Read from the config data group and loop through keys:values
+      # config=true && [[ "$(tmsh list ltm data-group internal ${DGCONFIG} 2>&1)" =~ "was not found" ]] && config=false
+      # if ($config)
+      # then
+      #    IFS=";" && for v in $(tmsh list ltm data-group internal ${DGCONFIG} one-line | sed -e 's/^.* records { //;s/ \} type string \}//;s/ { data /=/g;s/ \} /;/g;s/ \}//'); do f5_process_handler_config $v; done
+      # else
+      #    f5_process_errors "PANIC: There was an error accessing the ${DGCONFIG} data group. Please re-install.\n"
+      #    echo "    PANIC: There was an error accessing the ${DGCONFIG} data group" >> ${REPORT}
+      #    f5_process_report "${REPORT}"
+      #    exit 1
+      # fi
       ## Read from the config data group(s) and loop through keys:values
       for DG in ${DGCONFIG}; do
          config=true && [[ "$(tmsh list ltm data-group internal ${DG} 2>&1)" =~ "was not found" ]] && config=false
-         if ($config)
-         then
+         if ($config); then
             IFS=";" && for v in $(tmsh list ltm data-group internal ${DG} one-line | sed -e 's/^.* records { //;s/ \} type string \}//;s/ { data /=/g;s/ \} /;/g;s/ \}//'); do f5_process_handler_config $v; done
          else
             f5_process_errors "PANIC: There was an error accessing the ${DG} data group. Please re-install.\n"
@@ -956,7 +967,6 @@ f5_main() {
 REPORT=$(mktemp)
 echo "ACMEv2 Renewal Report: $(date)\n\n" > ${REPORT}
 f5_main "${@:-}"
-
 
 
 
