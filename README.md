@@ -2,9 +2,7 @@
 
 ### An ACMEv2 client utility function for integration and advanced features on the F5 BIG-IP
 
-*Major Updates May 09, 2025 - See updates section at bottom for changes*
-
-*Minor Updates December 17, 2025 - See updates section at bottom for changes*
+*Major Updates May 08, 2026 - See updates section at bottom for changes*
 
 This project defines a set of utility functions for the [Dehydrated](https://github.com/dehydrated-io/dehydrated) ACMEv2 client, supporting direct integration with F5 BIG-IP, and including additional advanced features:
 
@@ -15,6 +13,7 @@ This project defines a set of utility functions for the [Dehydrated](https://git
 * Supports wildcard certificates for DNS-01 and EAB providers
 * Supports OCSP and periodic revocation testing
 * Supports External Account Binding (EAB)
+* Supports device certificate management
 * Supports SAN certificate renewal
 * Supports explicit proxy egress
 * Supports granular scheduling
@@ -506,10 +505,31 @@ To push log information to Syslog, simply update the ```SYSLOG``` variable in th
 
 <br />
 
-To use a certificates configuration data group stored in an alternate partition/folder, update the ```DGCONFIG``` variable directly in the f5acmehandler.sh script. Use of an alternate partition/folder is generally required when making data group changes via AS3 automation.
+To use a certificates configuration data group stored in an alternate partition/folder, update the ```DGCONFIG``` variable directly in the ```f5acmehandler.sh``` script. Use of an alternate partition/folder is generally required when making data group changes via AS3 automation.
 
 </details>
 
+
+<details>
+<summary><b>Working with multiple certificates with the same hostname</b></summary>
+
+<br />
+
+A data group's keys must be unique, so it is not possible to create multiple entries for the same certificate hostname. In cases where multiple versions of the same certificate are required, for example, to support separate RSA, Prime256v1, and Secp384r1 types, the ```DGCONFIG``` variable in the ```f5acmehandler.sh``` script can be updated to include the paths to multiple data groups, where each data group can include a different version of the same certificate hostname.
+
+```bash
+export DGCONFIG="/Common/dg_acme_config /Common/dg_acme_config_p256"
+```
+For this command to work with a single hostname, the ```---alias``` configuration option must be used (and be unique) in each data group entry. For example:
+```bash
+/Common/dg_acme_config:
+www.f5labs.com := --ca https://smallstep.f5labs.com:9000/acme/acme/directory -a rsa --alias www.f5labs.com_rsa
+
+/Common/dg_acme_config_p256:
+www.f5labs.com := --ca https://smallstep.f5labs.com:9000/acme/acme/directory -a prime256v1 --alias www.f5labs.com_p256
+```
+
+</details>
 
 <details>
 <summary><b>Working with OCSP and Periodic Revocation Testing</b></summary>
@@ -534,6 +554,30 @@ This will return one of the following possible values:
 | unavailable | The OCSP check was not performed, in the case that the utility is unable to collect a chain (issuer) and OCSP URI value from the certificate     |
 
 <br />
+
+</details>
+
+<details>
+<summary><b>Using ACME to update device certificates</b></summary>
+
+<br />
+
+The ACMEv2 protocol is most often used to manage WebPKI certificates. This is especially true with the HTTP-01 and TLS-ALPN-01 validation methods as they require a remote ACME server to be able to challenge a listener on the ACME client. For an F5 BIG-IP that listener is a data plane virtual server. Device certificates live in the BIG-IP control plane where an ACME listener cannot be created. However, it is possible to support device certificates by performing normal data plane ACME, then copying that new certificate (and key) to a control plane location. That is made possible with the ```DEVICEHOOK``` option in the configuration file. To use this, 
+* Create a copy of the included config script in /shared/acme. Example:
+    ```bash
+    cp /shared/acme/config /shared/acme/config_device
+    ```
+* Create a new script in the ACME client directory (/shared/acme). Ensure to chmod this new script to make it executable.
+    ```bash
+    chmod +x /shared/acme/f5devicehook.sh
+    ``` 
+* Specify the script path in the ```DEVICEHOOK``` variable of the new config file. Example:
+    ```bash
+    DEVICEHOOK="/shared/acme/f5devicehook.sh"
+    ```
+    ***Note: Do not populate this variable on the config file used for normal data plane certificate processing***
+
+    When the ```DEVICEHOOK``` variable is populated, the **deploy_cert** function in the ```f5hook.sh``` script will call this separate script at the end of its processing, passing the certificate object name. This project includes a ```f5devicehook.sh``` script as a template. The copy implementation must be derived by the administrator.
 
 </details>
 
@@ -664,7 +708,7 @@ If upgrading from a previous version of this utility, follow the below instructi
 * If you've made changes to the default ```config``` file, create a copy of this file. The installer will replace it with the default values. In the case of updating to the 2025 May release, new options are included in this config. You will need to transcribe your own settings to the new config file to pick up the updates. 
 * Re-run the installer script. This will perform the following functions:
 
-    * Re-install the new versions of the utility scripts (f5acmehandler.sh and f5hooks.sh).
+    * Re-install the new versions of the utility scripts (```f5acmehandler.sh``` and ```f5hooks.sh```).
     * Re-install the default ```config``` file. Again, if changes have been made to this file for your environment, make a copy of your version before upgrading. You will need to transcribe your settings to this new config file to pick up the utility updates.
     * Create a ```bin``` folder under /shared/acme, copy a project local version of dehydrated to this folder, and delete the version in the root folder.
     * Create a ```dnsapi``` folder under /shared/acme. This folder will be empty by default. To use dns-01 validation, create your DNS API script in this folder. More information on dns-01 usage in the "Working with ACMEv2 DNS-01 validation" section.
@@ -703,7 +747,7 @@ ${\LARGE{\textnormal{\textbf{\color{blue}Troubleshooting}}}}$
 <details>
 <summary><b>Error Messaging</b></summary>
 
-The f5acmehandler.sh utility provides the following error messages:
+The ```f5acmehandler.sh``` utility provides the following error messages:
 
 | **Message**                                                                            | **Description**                                                                                                                                   |
 |----------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -767,7 +811,7 @@ There are a number of ways to test the ```f5acmehandler``` utility, including va
     ```bash
     tail -f /var/log/acmehandler
     ```
-  or use the ```--verbose``` option with the f5acmehandler.sh script:
+  or use the ```--verbose``` option with the ```f5acmehandler.sh``` script:
 
     ```bash
     ./f5acmehandler.sh --verbose
@@ -807,7 +851,7 @@ Special thanks to:
 * [Issue 10: Fix for 'f5acmehandler.sh does not create log entry if started on standby in HA mode'](https://github.com/f5devcentral/kojot-acme/issues/10)
 * [Issue 12: Fix for 'ALWAYS_GENERATE_KEY set to true issue'](https://github.com/f5devcentral/kojot-acme/issues/12)
 * Adds support for wildcard certificates with --alias flag on certificates configuration (data group entry)
-* Adds support for specifying a certificates config data group in an alternate partition/folder (for AS3 programmability). This is edited directly in the f5acmehandler.sh file in the ```DGCONFIG``` variable.
+* Adds support for specifying a certificates config data group in an alternate partition/folder (for AS3 programmability). This is edited directly in the ```f5acmehandler.sh``` file in the ```DGCONFIG``` variable.
 * Include several pre-built dnsapi scripts for various DNS providers, in the ```dnsapi``` folder.
 
 </details>
@@ -894,6 +938,39 @@ Special thanks to:
 <summary><b>Updates: 2025 December 17</b></summary>
 
 * Updated Dehydrated client in accordance with origin updates: https://github.com/dehydrated-io/dehydrated/commit/1dbbc64ce947af000b764e806429e3f87cb3a55e
+
+</details>
+
+<details>
+<summary><b>Updates: 2026 May 08</b></summary>
+
+* [Issue 34: Successful application of PR #986 for Actalis (European CA) support via kojot-acme](https://github.com/f5devcentral/kojot-acme/issues/34)
+    - Updated built-in Dehydrated version to move CURL_OPTS to a later part of curl commands
+* [Issue 37: Setting CREATEPROFILE to true reverts after running f5acmehandler.sh](https://github.com/f5devcentral/kojot-acme/issues/37)
+    - In the HA mode, use the ```--local``` option in an initial request. This will save the local config state to the iFile, so that subsequent requests will push this to the peer. The HA process copies all "config*" files into the iFile.
+* [Issue 38: Allow same wildcard domains with different algorithms](https://github.com/f5devcentral/kojot-acme/issues/38)
+    - Updating based on [PR: Added functionality for handling multiple datagroups](https://github.com/f5devcentral/kojot-acme/pull/39) recommendations.
+    - This update allows ```f5acmehandler.sh``` to process multiple data groups, which may be useful when a single certificate hostname requires multiple key types (rsa, prime256v1, secp384r1). The ```DGCONFIG``` variable in ```f5acmehandler.sh``` can be updated to include multiple data groups, separated by a space, ex. 
+        ```bash
+        export DGCONFIG="/Common/dg_acme_config /Common/dg_acme_config_p256"
+        ```
+        For this command to work with a single hostname, the ```---alias``` configuration option must be used (and be unique) in each data group entry. For example:
+        ```bash
+        /Common/dg_acme_config:
+        www.f5labs.com := --ca https://smallstep.f5labs.com:9000/acme/acme/directory -a rsa --alias www.f5labs.com_rsa
+
+        /Common/dg_acme_config_p256:
+        www.f5labs.com := --ca https://smallstep.f5labs.com:9000/acme/acme/directory -a prime256v1 --alias www.f5labs.com_p256
+        ```
+* Enhancement: Updated HTTP challenge iRule for APM
+    - The ```acme_handler_rule``` iRule has been updated to adjust for an APM use case. If an Access per-session policy is attached to the HTTP:80 virtual server, additional checks are performed to shutdown APM processing if an ACME challenge request. If Kojot is already installed, replace the current  ```acme_handler_rule``` content with the following:
+
+        ```tcl
+        when RULE_INIT { set static::DEBUGACME 0 };when CLIENT_ACCEPTED { set cmd "catch { ACCESS::restrict_irule_events disable }"; eval $cmd };when HTTP_REQUEST priority 2 { if { [HTTP::has_responded] } { return };if { [string tolower [HTTP::uri]] starts_with "/.well-known/acme-challenge/" } { set cmd "catch { ACCESS::session remove ; ACCESS::disable }"; eval $cmd; set response_content [class lookup [substr [HTTP::uri] 28] dg_acme_challenge]; if { $response_content ne "" } { if { $static::DEBUGACME } { log local0. "[IP::client_addr]:[TCP::client_port]-[IP::local_addr]:[TCP::local_port] Good ACME response: $response_content" }; HTTP::respond 200 -version auto content $response_content noserver Content-Type {text/plain} Content-Length [string length $response_content] Cache-Control no-store; unset -- response_content; event disable } else { if { $static::DEBUGACME } { log local0. "[IP::client_addr]:[TCP::client_port]-[IP::local_addr]:[TCP::local_port] Bad ACME request" }; HTTP::respond 503 -version auto content "<html><body><h1>503 - Error</h1><p>Content not found.</p></body></html>" noserver Content-Type {text/html} Cache-Control no-store; unset -- response_content; event disable }}}
+        ```
+* Enhancement: Updated the ```docker-compose-combined.yaml``` Docker Compose in the **acme-servers** folder. This Compose can be used to stand up a set of local ACME CA services (Pebble and Smallstep) for testing. Please read the file metadata for instructions on using.
+
+* Enhancement: Added support for device certificate management. Using a separate Bash script and a ```DEVICEHOOK``` variable in the configuration file, an ACME renewed certificate can be copied from the data plane to a place in the control plane to support device certificate updates. See the Additional Configuration Options "Using ACME to update device certificates" section for more details.
 
 </details>
 
