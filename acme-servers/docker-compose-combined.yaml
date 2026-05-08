@@ -1,40 +1,43 @@
+## ACME client system needs 4 IP addresses in /etc/netplan/<netplan>.yaml. Example:
+## --------------------------
+## network:
+##   version: 2
+##   renderer: networkd
+##   ethernets:
+##     ens6:
+##       addresses: [ 10.1.10.50/24, 10.1.10.51/24, 10.1.10.52/24, 10.1.10.53/24 ]
+## ==========================
+## All services will technically be listening on all addresses, but can be treated as
+## separate devices by virtue of port:
+##  Pebble: 10.1.10.51:14000
+##  Smallstep: 10.1.10.52:9000
+##  Bind: 10.1.10.53:53
+
 services:
   pebble:
     container_name: pebble
-    image: letsencrypt/pebble:latest
-    restart: unless-stopped
-    environment:
-      - "PEBBLE_ALTERNATE_ROOTS=1"
-      - "PEBBLE_VA_NOSLEEP=1"
-    dns: 192.168.100.53
-    ports:
-      - 14000:14000  # HTTPS ACME API
-      - 15000:15000  # HTTPS Management API
-    networks:
-      default: {}
-      webserver-net:
-        ipv4_address: 192.168.100.20
-    depends_on:
-      bind9:
-        condition: service_healthy
-    command:
-      - /bin/sh
-      - -c
-      - |
-        ## Generate config.json file
-        mkdir /configs
-        cat > "/configs/config.json" << 'EOF'
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM golang:1.24-alpine AS builder
+        RUN go install github.com/letsencrypt/pebble/v2/cmd/pebble@latest
+
+        FROM alpine:latest
+        COPY --from=builder /go/bin/pebble /usr/local/bin/pebble
+        RUN mkdir -p /configs /test/certs
+        COPY <<EOF /configs/config.json
         {
           "pebble": {
             "listenAddress": "0.0.0.0:14000",
             "managementListenAddress": "0.0.0.0:15000",
-            "certificate": "/configs/ca-cert.pem",
-            "privateKey": "/configs/ca-key.pem",
+            "certificate": "/configs/tls-cert.pem",
+            "privateKey": "/configs/tls-key.pem",
             "httpPort": 80,
-            "tlsPort": 5001,
+            "tlsPort": 443,
             "ocspResponderURL": "",
             "externalAccountBindingRequired": false,
             "domainBlocklist": ["blocked-domain.example"],
+            "keyAlgorithm": "rsa",
             "retryAfter": {
               "authz": 3,
               "order": 5
@@ -42,83 +45,133 @@ services:
           }
         }
         EOF
-        
-        ## Import ca cert (subrsa.f5labs.com)
-        cat > "/configs/ca-cert.pem" << 'EOF'
+        COPY <<EOF /test/certs/pebble.minica.pem
         -----BEGIN CERTIFICATE-----
-        MIID1jCCAr6gAwIBAgIBAjANBgkqhkiG9w0BAQsFADBXMQswCQYDVQQGEwJVUzET
-        MBEGA1UEChMKZjVsYWJzLmNvbTEeMBwGA1UECxMVQ2VydGlmaWNhdGUgQXV0aG9y
-        aXR5MRMwEQYDVQQDEwpmNWxhYnMuY29tMB4XDTE5MDIyNzEwNTE0OFoXDTMwMDUx
-        NjEwNTE0OFowXjELMAkGA1UEBhMCVVMxEzARBgNVBAoTCmY1bGFicy5jb20xHjAc
-        BgNVBAsTFVN1Ym9yZGluYXRlIEF1dGhvcml0eTEaMBgGA1UEAxMRc3VicnNhLmY1
-        bGFicy5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC3H/VTyUNC
-        vkqjxci3ypX3/QeIehFnxOj1qO09a0n91MvWBCgK4gM1hyEJ9nME6cVMu9bYGnJv
-        FA9rZwXGenwJ1LFkHBq94a6NSFcdcFawFek/qpJS4Q93jGTHtlQvZc77JxGn+aSv
-        1tSrw60v3t9UkQRCbCUp+DmBauKXmBt6s4Vg7Yc1Ot41tTs3Xv9Nc7TVonCjSms/
-        T3tOBX7/OWyvGU3kWWMiRKaGJFzMrQimELJFwC64K8NHKKKvdv029BuH8X8TluqG
-        yMZHlDam9s9pJqXIeZsDT+JGgppffvNMZfiWFEyNaj3hdVHE2WRLUh6eFli6PigJ
-        yG0h/Qz6r58lAgMBAAGjgaUwgaIwQgYJYIZIAYb4QgENBDUWM09wZW5TU0wgZ2Vu
-        ZXJhdGVkIHN1Ym9yZGluYXRlIGF1dGhvcml0eSBjZXJ0aWZpY2F0ZTALBgNVHQ8E
-        BAMCAYYwHQYDVR0OBBYEFKI+o3qMQR2u/xMNWuL1DGf/eIKyMB8GA1UdIwQYMBaA
-        FEoQGb5szH9/+K832NzHSZ1bJtC+MA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcN
-        AQELBQADggEBAAVlXhDW/LCLrJOjW0/x9ej83q4kHLWJYuLZl/SGe2KnyIknqkX1
-        Z0Vs+qs2wTtdJELsjWu+0WmwAaDHQzhpLV7lu+jRl0td1QeJoKnFbA/uTBIKKY3d
-        BfQUodywZ14bW/9cXUiUIye5dO9JGxNt+PVlgKdSYUU9D4mxOvjG0xuDyIDzD64d
-        J49hmhFTuqJRc0ps/Duqb0eaoDFITfNAgqBkUeWw4dsjYrTKpGVkrl2dWtk3GCFX
-        fpgc8qGDAmuq8Dt2O+2J1yNCDFx79OH+furhh5EUvNI5BiPy1zjrwz/W/JlOc0vg
-        GBlq13rqHWMmX8DV1xgSwS3oRdrsgr8p6hs=
+        MIIDHDCCAgSgAwIBAgIUbh1ZS6nIXt3goxysuDbDL3xnczIwDQYJKoZIhvcNAQEL
+        BQAwFzEVMBMGA1UEAwwMQUNNRSBST09UIENBMB4XDTI2MDQzMDE0NDUxOFoXDTI5
+        MDIxNzE0NDUxOFowFzEVMBMGA1UEAwwMUGViYmxlIFN1YkNBMIIBIjANBgkqhkiG
+        9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs2HtwLDHK56yy8WsuXAC1/KVag4AS6sedG3j
+        hqOFo2SmOOHkFb0AADljOUhV+flKsDizt8LVRwTFma1ezMOJWu4ReydVA82ojwO7
+        NwUD9RLe3pwHcbVLD4a5Xa2VVBiBA0Yg8T0C42nQg6Okpsn8KDEYRl0+ydfaqd0Z
+        csHB1btX3G0aJkAllTf6Vtx/sHBx4yN5+ZBI1ANwYNuZDi7RkEDRfay+Bfsxj/Al
+        6MgSs9dtSfWmvyQoTTdnjV4PeTgpQwiOQ42ztqWtKGQq9s+9ruSnVM8/l7316pNh
+        qHStBKrHEdfnHGC/LUGgSgTLTpaJcxT2UZNag/MR3o6eV2i/SQIDAQABo2AwXjAd
+        BgNVHQ4EFgQU9tACHYpHppaREpRIiSWOaq3MZU0wHwYDVR0jBBgwFoAU/v0qFp++
+        2sdUwJf/asH+tuu6RoIwDwYDVR0TAQH/BAUwAwEB/zALBgNVHQ8EBAMCAYYwDQYJ
+        KoZIhvcNAQELBQADggEBAKXo4DLGnih74ETjkVMruSyDoHMm7PptWicQQaA8fs2p
+        i0d+k8TnkiYW9GrG436TPlZIW5xuhNJrMmjk5T6iZVRD029U1s4Z0JpoW2QyTYze
+        JqwgH9sjR7/3RCDt/71SLyJsslfloi4obB4LuQ9aGuaDAwN7CIBaCn22xU6u5xQK
+        y1X/CZo2wzsLAKgk1c4NoVaSKHVNc1lEdf4z2BK6fIH6iR93A651XIHwtOKlcCal
+        qjCHx3xCZwvzzB8kWP3idmFEshracWrA0MxIfKcNgFiUAE7wGrp+gFdJB+GjpJS5
+        026BSk0VS7gMLZjYG/k2gRoJAKFZjM9Ib4XFfPqVwxw=
         -----END CERTIFICATE-----
         EOF
-
-        ## Import ca key (subrsa.f5labs.com)
-        cat > "/configs/ca-key.pem" << 'EOF'
-        -----BEGIN RSA PRIVATE KEY-----
-        MIIEogIBAAKCAQEAtx/1U8lDQr5Ko8XIt8qV9/0HiHoRZ8To9ajtPWtJ/dTL1gQo
-        CuIDNYchCfZzBOnFTLvW2BpybxQPa2cFxnp8CdSxZBwaveGujUhXHXBWsBXpP6qS
-        UuEPd4xkx7ZUL2XO+ycRp/mkr9bUq8OtL97fVJEEQmwlKfg5gWril5gberOFYO2H
-        NTreNbU7N17/TXO01aJwo0prP097TgV+/zlsrxlN5FljIkSmhiRczK0IphCyRcAu
-        uCvDRyiir3b9NvQbh/F/E5bqhsjGR5Q2pvbPaSalyHmbA0/iRoKaX37zTGX4lhRM
-        jWo94XVRxNlkS1IenhZYuj4oCchtIf0M+q+fJQIDAQABAoIBADWsl1KUljNU5Tm1
-        egxsw6IpNvEInltk+scuWUL8VHaizZAQLdBqyHgDAGsUIkhZYKwKDoHO1qW6In7f
-        dnDja8HR5qCqIChxoqDkiCwnxjDcaz5u9251avwmWU+0IF64H3+7xtAOOvgTJsil
-        lPiIAbueubniSs5PZEOLmZjHS56dyngtKUEMVXS1LQiSYGGTHk5VXL6T4zeaEB0D
-        ofVhdqvYNsS0+3JsaPcGk0ou3wwTSOsWngBqakcByWH/1qvbEC9EqozYliVY2ICk
-        T7MvmP37Y7AEt9ufRWBZ2T8bvVztiBUD3I+ieYQlYGKoxHONYlukJsXt31Cx/2WI
-        wO/xSaECgYEA6dWgzIGSLmxDAnOUUNIv9MuEuz5tcAlxwstxliF4TPvEvhq1laOC
-        nplZ0n6pJxSEfpHeUPASMZJIhjAJTFAIghCDVhioVctKTBqbUXY8qW2cZv8RaECh
-        CQQo6WVRoD84Awm3EpQyhW5WgzFY1+LmA1tQIAgZhS2hPXU8kbIz7U0CgYEAyHvH
-        UcZcwWsHV4pYtX4A3PQJmNJPZaW3cvtMQ3oWvIC+Ar+HJb3gfdLqhWPoz40QugIQ
-        ruWB2ClF+naW9MEaAPymXOHjd1+rqHesTMnZ9S80PJUUWI0zHrmZHssDPplNSoBN
-        zKGogXDGtTNwP3rNct9tauXeySC3fZ4riCJubTkCgYB76YnpdWwqj5I+9VKONaPW
-        HBc9RkqmCUswh7CsdxYR7YUHnI3HOzuXofn4Ush+fh/sFo5x45YwkK0/9qqmtu6b
-        RfbjI/Poau73P045L+fbfMtZxSbLURxE8+BeNiO4QGgFLBvIi6HuFVdg9EB5PrLW
-        6oeeQcyMR27fa4XqSz27LQKBgDq4HkHyQlqYOXdHWwIVXLVaeLEc8ApKhjeUKNse
-        mCgv4Pc3F6NTQLw5mVzmTVr06zA/yJkhOW2RcSCRuVcIc9BUL3nG43OkPsfB/WIk
-        QMVSRQ91bpcdDBr0q0dcmJ+uEPhAKglEU/FNkbWi0j6VfjUmAYsstprcDUIqoH9n
-        7kXpAoGAU+KHZNtlO6CghVYwANDyo0x4lZQH1zgHgkrnkWqiEIiNzz6YUasjUgJl
-        zwr9fcEOy+fnddruBAx5YWJGuvssXp5lgvH1bu4rljhkTz6ee05Cog80p8LPmvlo
-        REs4Qps547E/ICMEmxln7dj+T0RtvXfGlrt+DioD3YF/ciXAA7M=
-        -----END RSA PRIVATE KEY-----
+        COPY <<EOF /test/certs/pebble.minica.key.pem
+        -----BEGIN PRIVATE KEY-----
+        MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCzYe3AsMcrnrLL
+        xay5cALX8pVqDgBLqx50beOGo4WjZKY44eQVvQAAOWM5SFX5+UqwOLO3wtVHBMWZ
+        rV7Mw4la7hF7J1UDzaiPA7s3BQP1Et7enAdxtUsPhrldrZVUGIEDRiDxPQLjadCD
+        o6SmyfwoMRhGXT7J19qp3RlywcHVu1fcbRomQCWVN/pW3H+wcHHjI3n5kEjUA3Bg
+        25kOLtGQQNF9rL4F+zGP8CXoyBKz121J9aa/JChNN2eNXg95OClDCI5DjbO2pa0o
+        ZCr2z72u5KdUzz+XvfXqk2GodK0EqscR1+ccYL8tQaBKBMtOlolzFPZRk1qD8xHe
+        jp5XaL9JAgMBAAECggEAHC0HoTqjLjDROLyl8sKrT6wk1/G3DiukrvkLwfwxY4bN
+        rSWeI+P5+g8JjNfV2VvU5XUilXye73bKaucWeudDzeqTCFsXOW+2SDB32Z6KDpaW
+        NzUe3jdxwNCSkSpQyFLJAPCk//9rUrkuLV8o36HeX5nGjFbdI+spx4CZHLNedOmi
+        SuHx1ax+mA0zX53Rjgr4MayVD32va5sbDiioDnzGKcU+HVRa3TQr406vd0Ez90t8
+        xZAW85nQQPZBcdggdHAUquWWGUa0CAO+OCEOjikmgczcsEaTEUanPdyC6rgQVYgh
+        jSHIoivDw4FSQRHtyTh7/P7YTXNO1gKq2QslBM5NYQKBgQD4CCMOrI44Iacb+2J2
+        6neQC9Ou+f0C2hm+87iRtIiVeVsOAvY/vMY9RaO5pwy8aWtn7LDp3fgC/TRhPHFr
+        y5CyOKspEUmxX0us5ZQTtna+6g6PckMg44mc+L9mLG/Czw2U3YBc8QUSDxC5fMTU
+        9sTAYmZrcaoEcvUoKPJ+6gZ+PQKBgQC5JTTjci0rwlsEVizDMZdwq/iI5SVhTMNH
+        dBt2lcL3iY7GcwqlCujUErosvkIlSWQcaqBkQTJqk/DcPEs7qaltUTwYlC3koUR1
+        cjsb/vMqXX89Na1pKj0wGODYVsp/IlqewB8X34xFiE3nlnvstw961zbKoYzRImmS
+        3+MY0DrB/QKBgQDwnDQmEA8HNN4/ruYeJeZGvrJjk+91zM4dB6GM921oU4mZVhY8
+        Toyg8+WYPA2G2V1wO5SDyujFPYyKp2//+kIsIf0oobSzdJac6zlyxhb7rWLilR25
+        0gG1XTmPjJv+h43NU/MqNkWM90BqMDdhwOGtH8frgyBDoKFijBZyN+SEoQKBgGak
+        fu69hNdmt6ju0YAhhTC81lumlhOcSALcFsGmg2FSjKnua29WXf/8peRaUjdzuaGb
+        Z3JNRtMZU4X1k0vvYnOtfqCtvcertFVcT/LUZCEPlpPrp0jPVv7MPBMUAs160TyD
+        jHliwNRnnbEPl4KDdnyGxeSOrY/gASGhJ7jA8GJNAoGAbnJEHREj8Kx+cRH0vOQM
+        qIg7QgnYyWOkwsYmVhhGQ5VuVE/5m9rV7bWvfCE9x3Z7SW6cmUx3djrVMnHL4PLV
+        CIKo51nB882HTP9eUjta9UDeXvGcgUZzeOkq3PL4L54qVdYYNK7O96pFq+TIgr3O
+        xjnPfcMm8/OW3m0+WZAyGxo=
+        -----END PRIVATE KEY-----
         EOF
-
-        ## Start Pebble Acme server
-        pebble -config /configs/config.json -strict
-        
-        # tail -f /dev/null
-
+        COPY <<EOF /configs/tls-cert.pem
+        -----BEGIN CERTIFICATE-----
+        MIIDQDCCAiigAwIBAgIUftL3IhvwFlliOMa1pMsb0DNNxLcwDQYJKoZIhvcNAQEL
+        BQAwFzEVMBMGA1UEAwwMUGViYmxlIFN1YkNBMB4XDTI2MDQzMDE0NDU1M1oXDTI5
+        MDIxNzE0NDU1M1owHDEaMBgGA1UEAwwRcGViYmxlLmY1bGFicy5jb20wggEiMA0G
+        CSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDtx8PIWYG91uhZRqc2QfFopV1RdHG4
+        ec4JYGPIWXPj68uTHXpcaQoPuI1AlkLjolI+l4GPOLs3DmMnmJYpnVfvxWIYqlgV
+        ziQ/oeFIQvltOI0+zo6Udf1P8hLkckQ9oe2Yl+k41XdnRxqUve9frYnKxzJDcXNe
+        P09PMO3dX4BCdLNXFvtyu4wBIWFDxgImn+2oWFHeUxrPkshiFSWayGJT9+w+nke/
+        RlVIzeglsOahxvptZiDb3u3O+YSQf/hk7hJdF4BR/PA5l83ti7bgVGZjfWEb6IWE
+        Hnt6kgBUgmZxvyrE2ImCAbDo10vbAqt/6DEv1NcZ2HMIIZGs1hVtZ4tjAgMBAAGj
+        fzB9MB0GA1UdDgQWBBQ4V58GJ2ix8M+gZtBqG9+/cAl5VzAfBgNVHSMEGDAWgBT2
+        0AIdikemlpESlEiJJY5qrcxlTTAcBgNVHREEFTATghFwZWJibGUuZjVsYWJzLmNv
+        bTAdBgNVHSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwEwDQYJKoZIhvcNAQELBQAD
+        ggEBABU4VTf3ci1RKzZiiCzdJnNFmmGsyxvLn4VcTueKg1AIxIAweD0oE4oIUvT/
+        gnHCEseH6CBh2kQO+gMX9ozF2DG8lhD7nM6JMv9wT43ih5ofDzoGmQiW9cbhanbk
+        60pa6L+3AWdkVrn4SFPLVl27547eHNrOEIlYBNUy+X+2CwB/0oAHRN41O8ld6PeR
+        8WRVXmLE3PBrYejIWC1Ojxs/BiTLHTw/lzn5PZoOUjvEMWdE/BVjMsVI4vCgihNZ
+        9pmaxwVwV3e5u5IdUGDu+2bnGRGcXlgn/H9cRcm5FaRENiXPkaDmSLz6JDIrjpLs
+        6rYPkED96S6NLwRf5o0OKQ4+hWY=
+        -----END CERTIFICATE-----
+        EOF
+        COPY <<EOF /configs/tls-key.pem
+        -----BEGIN PRIVATE KEY-----
+        MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDtx8PIWYG91uhZ
+        Rqc2QfFopV1RdHG4ec4JYGPIWXPj68uTHXpcaQoPuI1AlkLjolI+l4GPOLs3DmMn
+        mJYpnVfvxWIYqlgVziQ/oeFIQvltOI0+zo6Udf1P8hLkckQ9oe2Yl+k41XdnRxqU
+        ve9frYnKxzJDcXNeP09PMO3dX4BCdLNXFvtyu4wBIWFDxgImn+2oWFHeUxrPkshi
+        FSWayGJT9+w+nke/RlVIzeglsOahxvptZiDb3u3O+YSQf/hk7hJdF4BR/PA5l83t
+        i7bgVGZjfWEb6IWEHnt6kgBUgmZxvyrE2ImCAbDo10vbAqt/6DEv1NcZ2HMIIZGs
+        1hVtZ4tjAgMBAAECggEAcyN8x8qjuv/SEczXEjxbP993MQawPHJq1PqCRtUd+3tF
+        3+5xvka0swkcCO7Z4+1JYvqtJ2OCsDW8yMMnz23b04RiLGxr698eiVuDQaEAs6Uj
+        LAsMWpJJv4kKIem85pU+/lls+vLO90kkc2sHeu6G3xSW37aTdUs1xbR9MelZK5P0
+        7RH9r4unEi3yK+bQ6dcRkgdkmyMaEyTgcm41h+bPhjZc+BkHEMcw/qzgQCFqIusr
+        o8FWtvSWq0gGoOdapsNZGlBDLgEaOPOkh+4e1DaOD0z52FSDXExd6bpbK9lMQj7w
+        sNE36yEBEYIV5JbrQinepnyFO7cHRohUukxkFbCYwQKBgQD9sYK9lnUJEpYotDTV
+        x3Z7PrkSb0rb3/kSimk6oiqDPDT2oX3hsq/cilWnErV2EwTqH9B+pDuNn0E3bdQn
+        0hzVLvZAbvr7yvrdpc7SDNZjlCgvkuF9NbSGUKxW5lomLbNEtKjTHo01EDKda1mu
+        UzkTxdJMHPC0QonLC+4OiphcIwKBgQDv8TccY/Veigmt6WNvcWW4P0l/z8XwIMwH
+        9hpQaXM68l063Vn4kw2pkfg1WlQtg8W/8u/EBgILT6310c3pyB6dMQXg5ojeTM49
+        YiPD6haxCmYIM640uGZA1KjmA+yQHa/GXLXDRMHGhZCUU33tzWaEn6IraLWoX586
+        RmcKqihnwQJ/XyIx5OaG/N/7b0gkiAZEZ/Mdc8xIRiu3OzysOVCWoJ/zPIlSq1BW
+        ol09wWlCowR+000a4mKz8mfGDQMii8w/A7KYpZD4jXOQn42OATbPLohgiXaLGGkL
+        SVL3TZ8ULzzz/M/Cf2j1ivCICoA3ISgUP1XvhptTqEVLZtkSbGGMwQKBgQDW/Nm1
+        bXbwE1zi38iBlShgMwyHIcKoCqrlw0QGosVlnr2cPbMcv54xPqIYI+xir7wi5eih
+        SgTQ377uD+OhQfb0P3WV8tnV3Rm59FI5e2iDjt6nIK9Je6PbGPCQ0BlJc+AIKw+N
+        e/DoEMrfrAOcbDscP/BNVs/VooAH9gbjjl0PwQKBgQCljOUnNoMLuXy3UQdz70LZ
+        UfyoK+GYM1zbyFpBfNGSCUTX9xIQ204WqxOcaznXadvOgq9Tr+f3Rw+fymfoHg+/
+        AfnSdj5ORxnENrwu8fUq0o/v9npD/EjUSsBTRPU5T0bDYH3o36H8/pHbQ8us/g1L
+        VMbGRP3wis6cMzyW+3xN8Q==
+        -----END PRIVATE KEY-----
+        EOF
+    restart: unless-stopped
+    environment:
+      - "PEBBLE_VA_NOSLEEP=1"
+    dns: 10.1.10.53
+    ports:
+      - 14000:14000  # HTTPS ACME API
+      - 15000:15000  # HTTPS Management API
+    networks:
+      default: {}
+    depends_on:
+      bind9:
+        condition: service_healthy
+    command: pebble -config /configs/config.json -strict
   
   step-ca:
     container_name: smallstep
     image: smallstep/step-ca
     restart: unless-stopped
     user: 0:0
-    dns: 192.168.100.53
+    dns: 10.1.10.53
     ports:
       - '9000:9000'
     networks:
       default: {}
-      webserver-net:
-        ipv4_address: 192.168.100.30
     depends_on:
       bind9:
         condition: service_healthy
@@ -129,86 +182,132 @@ services:
         ## Generate password file
         echo '{m2*F!fhAsY6sP&*=lLtYMIu)J_T6kVH█' > /home/step/password.txt
 
-        ## Import rootca key (f5labs.com)
-        cat > "/home/step/rootca.key" << 'EOF'
-        -----BEGIN RSA PRIVATE KEY-----
-        MIIEowIBAAKCAQEAuSFJGHLO3pHhFjBkIdnYO0MYtWkG+0YZp54ldzts41A5vUww
-        ZIVggf1CtL69YiCWrllnkHADNQFORFChFthC5m6uwwSmxI4UnJ1+HmS0+vYyofNg
-        uMt0W0lnDYTq5ZXrkBN5/yKiQX1rDUxYQaEbiCRsO4wkCD1Cz0ydZ+NAr6kkUfIn
-        NMQwvl3K1+cYtDxvgb/IEvVS8NhBYPc37qmfRq3Iuf+D84Enj4vXty+0scXiWfxG
-        zUlCk26twyIEb7jGaLR/XZsmU8bwGMjrizs1KzVccz94LydpApMHFreDW243/Xge
-        knBIv0lDSk1S69TRmA4Dd4JZhLzLgxh6DM3IowIDAQABAoIBAAVaYAmz8CVhZHfG
-        yG5uJSF5jDJaqhgD6+P736t17W0ZOcIufMu7S5IWp6IgTcuTk6fQ7/yuMHmM4x14
-        k1/cuvp8wtLixIu0bAYnS6lHUjBbhBVIu0g8oc2t7qvmZwBieGA/H+zvrG9mV/0X
-        cwnaxbgHDZYfND+EvfTOi1KgsJMjrUWszc51RVQ90wKXdaBhqywLA2/GumJg4EFi
-        lodw2J/Wbr+dGfquf8rdsLA1nwwPPMkYMJ2AHLEKEumkelUePiepYqvXOtsJqigI
-        4LdCaKDQJjzyeMBqbjv4dejbb6IjHz4eeYFV9QjYpzvyom4G6K96nIK7OoXspUwL
-        Zd6J3NECgYEA7OcLidHbBx+WwWbomdTFFXquJQxe/hzESZN+w1Tt73dOvqj36G3J
-        sqfC9/LtUfPkcLtersoiTAyhM7GQoVS4vsfzIzXjZltq0xDWXWDo42Sz7dD3NooU
-        /Xo0NiqTHoONPLNDQdqwS2PAVZCXvsc7VJ9MLUbbplFTimPaO4NoJTkCgYEAyA3P
-        2q7Sfu3rv31b8zV67KRKlLv+d0M5TY0NeVMqDGQZqGN00S7sNrauUjQS7wK9QpAH
-        aQrBE9I3QrgVgsWLReseQi/WL8pbrpDtL3JxrRFgdnTLm1yAs+NUKPWv4MfV/ODf
-        ZkR0JyCtQfEdaeegjUP2qMCx4Ndj9LOdoZFnWLsCgYBjmSuHsNvV3dkCzKIj8ok9
-        Y4uNdesGCNAZYtJbivxRviY0EFPRuz6eRtu4ZMCTwOcc4hmHgOH0eSbY1eFJgpX9
-        V5EID6LgKLT7sct+DL08xNzEsiMNIfZ7LwJ+d13M6V/a0j8Hk8qkl3aIQrcZdSej
-        hyl+q5izDuQBfcOFW9TQOQKBgQDFqF/lwTVZE9oJqOJgukZp6SmHKveQ/mpvpR3a
-        8cBp3b08Eogo5iOdK4Gw1qKeZCZ6zbOEpYt++gR/d0JJosSooFWVL46ASX+sSqUO
-        bBTE2pZkc6F4Lz06fzF4BsdvYAKdh9EyShA5WJ/Wt1RIfwKykKP0t+8IJ8gqzgzA
-        xdlGYQKBgDY9qObGV+3RXMZLUuyurZoiRCvrSpUwz84LxMBX9GO+p+RKZ2JFR7Uv
-        /dAejO3FWHBCYbblpM57/LfFzByISqOlDlEOUMO6zMKMa+libHrPsOJ4/b6n6PaR
-        yq2Hh8HxRgiLu6lybMPfN1VH6/3Fg82nKtiPBN4Xt22/XWiHtBbf
-        -----END RSA PRIVATE KEY-----
-        EOF
+        ## Create all of the subdirectories
+        mkdir -p /home/step/{certs,secrets,config}
 
-        ## Import rootca cert (f5labs.com)
+        ## Import rootca cert (root.f5labs.com)
         cat > "/home/step/rootca.crt" << 'EOF'
         -----BEGIN CERTIFICATE-----
-        MIIDoTCCAomgAwIBAgIJAL859gCV8N/6MA0GCSqGSIb3DQEBCwUAMFcxCzAJBgNV
-        BAYTAlVTMRMwEQYDVQQKEwpmNWxhYnMuY29tMR4wHAYDVQQLExVDZXJ0aWZpY2F0
-        ZSBBdXRob3JpdHkxEzARBgNVBAMTCmY1bGFicy5jb20wHhcNMTkwMjI3MTA0NjAw
-        WhcNMzAwNTE2MTA0NjAwWjBXMQswCQYDVQQGEwJVUzETMBEGA1UEChMKZjVsYWJz
-        LmNvbTEeMBwGA1UECxMVQ2VydGlmaWNhdGUgQXV0aG9yaXR5MRMwEQYDVQQDEwpm
-        NWxhYnMuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuSFJGHLO
-        3pHhFjBkIdnYO0MYtWkG+0YZp54ldzts41A5vUwwZIVggf1CtL69YiCWrllnkHAD
-        NQFORFChFthC5m6uwwSmxI4UnJ1+HmS0+vYyofNguMt0W0lnDYTq5ZXrkBN5/yKi
-        QX1rDUxYQaEbiCRsO4wkCD1Cz0ydZ+NAr6kkUfInNMQwvl3K1+cYtDxvgb/IEvVS
-        8NhBYPc37qmfRq3Iuf+D84Enj4vXty+0scXiWfxGzUlCk26twyIEb7jGaLR/XZsm
-        U8bwGMjrizs1KzVccz94LydpApMHFreDW243/XgeknBIv0lDSk1S69TRmA4Dd4JZ
-        hLzLgxh6DM3IowIDAQABo3AwbjAvBglghkgBhvhCAQ0EIhYgT3BlblNTTCBnZW5l
-        cmF0ZWQgQ0EgY2VydGlmaWNhdGUwHQYDVR0OBBYEFEoQGb5szH9/+K832NzHSZ1b
-        JtC+MA8GA1UdEwEB/wQFMAMBAf8wCwYDVR0PBAQDAgGGMA0GCSqGSIb3DQEBCwUA
-        A4IBAQCBGj/nKgjS4JjKt6GvPbVEiTBwv2WBejJ97ozCMkdWCmMEESJ9lkVruIOI
-        BbfXxOXHSxhXPrQXQjCy0zPXG1beZSHhk1mKUoWK+JqMyxoNAQkDfLsdd34TApHW
-        kIItc4nxmGM4RoKWxqzAxsYr0e0fvHwiPoqvebNrVtxcdm7Zltng3l2O6uM/DiT/
-        IUa9IcD0LNAxOA0qF1GTJkglbjwRHEpNSfO0qg5WEfUEOHLi2M0aB3v7lZXmU6q4
-        Gt5YRbIFCDf25i+I4yqXWER5iyZgee7WNyiz3UJpasx5eZRqtK/FGFK9hKK9/35H
-        BrdlmzkznKUvswZmcvR7nXbxI5qv
+        MIIC+zCCAeOgAwIBAgIUR9DWR7LAQcTPcihm0InhHpMu/YowDQYJKoZIhvcNAQEL
+        BQAwFzEVMBMGA1UEAwwMQUNNRSBST09UIENBMB4XDTI2MDQzMDE0NDQ0OFoXDTI5
+        MDIxNzE0NDQ0OFowFzEVMBMGA1UEAwwMQUNNRSBST09UIENBMIIBIjANBgkqhkiG
+        9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyGEcnnzPz00jrvfrxPrjtthEPwchmFuUD+9o
+        4dDSK0e+SHn307YWUpfRJAG6xIaW4sxxvusvLBPLBjhK4aPDEQX5GLZfWYm+b8W9
+        L8/uDttNaYhk1yQc1NNdqSwGJ1oSvMnIVGOW/5teLvqhh7Ilq/hBMqBVI22AsH1n
+        +uJjTpeFj3QiaWPZXfA3yjrFwfgDbJ46n+GnLgK46orWh+1s3UlDM9TGfk1OqUDb
+        XaeU7RFSDD5qJz9c2qmafZDaIWCxY40MmWgCyg78ZzBVcFAtTkJngVv0Qe0s4CCP
+        QIroj7Bz+RCqoKFjzBHLSf0vFFzd5Wtzgoe60wJCfDPmhjmU+QIDAQABoz8wPTAd
+        BgNVHQ4EFgQU/v0qFp++2sdUwJf/asH+tuu6RoIwDwYDVR0TAQH/BAUwAwEB/zAL
+        BgNVHQ8EBAMCAYYwDQYJKoZIhvcNAQELBQADggEBAMgLfeUeelmipfR4q8mRFhak
+        o8ZRRYfby3fsrG9qWA+XdoFrqSR9eYEbxPABDU6BKj06SnebbMOAv1BovG8tXbDt
+        RNcRVD5efte6aPEB2K5Rui9WJ5l9XPbbA1XEBFTB2AX94ME7C+3X+m+pud4jqzjB
+        3tNgoIPeq0C/7AFbfaR6w1m7auufEBiGV9cvQmBezAXBp596q6PB6Tx2BjbiMqsS
+        9lvjoxBZf2RTyr1Iv5rtHvefbH9ufDpKmILDBM1+sQgngiYOUOTmlmncLBwBiuL7
+        HDJuASV/8b4/3JUt4BV+8bRdORCSsWOZYRIoiXKTmxRHxKji8uhDvjAibCAoo1M=
         -----END CERTIFICATE-----
         EOF
 
-        ## Trigger step ca init
-        /usr/local/bin/step ca init \
-        --name=Smallstep \
-        --dns=localhost \
-        --dns=smallstep.f5labs.com \
-        --acme=true \
-        --deployment-type=standalone \
-        --address=:9000 \
-        --provisioner-password-file=/home/step/password.txt \
-        --password-file=/home/step/password.txt \
-        --provisioner="admin@f5labs.com" \
-        --root=/home/step/rootca.crt \
-        --key=/home/step/rootca.key
-       
-        ## Overwrite minted ECDSA intermediate cert/key with RSA cert/key
-        /usr/local/bin/step certificate create subca.f5labs.com \
-        /home/step/certs/intermediate_ca.crt \
-        /home/step/secrets/intermediate_ca_key \
-        --kty RSA \
-        --profile intermediate-ca \
-        --ca /home/step/certs/root_ca.crt \
-        --ca-key /home/step/rootca.key \
-        --no-password --insecure -f
+        ## Import intermediate cert (smallstepsub.f5labs.com)
+        cat > "/home/step/certs/intermediate-ca.crt" << 'EOF'
+        -----BEGIN CERTIFICATE-----
+        MIIDHzCCAgegAwIBAgIUbh1ZS6nIXt3goxysuDbDL3xnczMwDQYJKoZIhvcNAQEL
+        BQAwFzEVMBMGA1UEAwwMQUNNRSBST09UIENBMB4XDTI2MDQzMDE0NDU0M1oXDTI5
+        MDIxNzE0NDU0M1owGjEYMBYGA1UEAwwPU21hbGxzdGVwIFN1YkNBMIIBIjANBgkq
+        hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo3CccJAHaYO4ppeblaZd9k2X4sGmjQfi
+        IK48HTYEHphvfAFkQ3gc9esGX+w2k8x6jly/Xj+J+j/WHXyb/tyHI6xbqEpv56Pg
+        l5BzPlQ59ia8C35X/f4YsNX43dUYNclQ8L91fDq2t+EsCc4xFJ7YlQRr0kg+072U
+        vtjxkcPyE0Zi0Nr8A2rmjX4yIPQSY7Ac+wUNejCWc0oyWw3Mh3+uKvhGUnOYXR4n
+        e35aN3Esh9DtKLB464Ey9ZgDD4mxBMObB6P9n+uKq7WzJLTOpPFx2Dk7sHfYeL0K
+        snj0ccJLlJHQQd6oL88YU94ieYOKWK5ukbdV2SmnOXYu6HYfD7Ft4QIDAQABo2Aw
+        XjAdBgNVHQ4EFgQUXt/Zv8zWpunsSfOV6AzuLhLK6b8wHwYDVR0jBBgwFoAU/v0q
+        Fp++2sdUwJf/asH+tuu6RoIwDwYDVR0TAQH/BAUwAwEB/zALBgNVHQ8EBAMCAYYw
+        DQYJKoZIhvcNAQELBQADggEBAF0XtJNvyeh5PXFfGMlCWrU+NWvcb7kHsLYf4xJ9
+        2hcRoWVJIQhKM/g5c5Tlba460wc7cLCQ7CwhHSkqY1w8keJT8mWNhn51unNi42TX
+        +qEz8PbL1LBE2Eb0ofZIomO3xWVDsqtR8zQzmolmZrb0JgBI4X1KPFJ1Ibm6olXP
+        AOYK5lwOHTTUyX08yXK+db2gHcoEDLZHiohng+chGE7QhjJCU2clfyx3qEpXXae6
+        ZvswGtO4AAcsi9kvsE1hxo1WuKo/aZVYQhVmUpOjJUPsdxBBDFmPqXgzaeMJAgRa
+        11Ap+nFnlStmxOlgJ4Y4lShb6pNNBiP4xLtNykntYY0JLwY=
+        -----END CERTIFICATE-----
+        EOF
+
+        ## Import intermediate key (smallstepsub.f5labs.com)
+        cat > "/home/step/secrets/intermediate-ca.key" << 'EOF'
+        -----BEGIN PRIVATE KEY-----
+        MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCjcJxwkAdpg7im
+        l5uVpl32TZfiwaaNB+IgrjwdNgQemG98AWRDeBz16wZf7DaTzHqOXL9eP4n6P9Yd
+        fJv+3IcjrFuoSm/no+CXkHM+VDn2JrwLflf9/hiw1fjd1Rg1yVDwv3V8Ora34SwJ
+        zjEUntiVBGvSSD7TvZS+2PGRw/ITRmLQ2vwDauaNfjIg9BJjsBz7BQ16MJZzSjJb
+        DcyHf64q+EZSc5hdHid7flo3cSyH0O0osHjrgTL1mAMPibEEw5sHo/2f64qrtbMk
+        tM6k8XHYOTuwd9h4vQqyePRxwkuUkdBB3qgvzxhT3iJ5g4pYrm6Rt1XZKac5di7o
+        dh8PsW3hAgMBAAECggEAASdFy1uQ2dNGpdJTFELIzfitNjn0oXEpTN696NzdOZQM
+        0Vy3Juy9k5S1hk7F8dQTF1cbOKCNKjlyGuIqvakzwPIx8WWZFZLn/lnUHl/8yrpq
+        QFCDcXTuGq1f5Lzgv1xs2E4Zl6dYa8LIi0crvIAEekS+OA0veFIRrykbx1IRLsag
+        +khpOdw/vF3uD/Nq9ldCRuDWMKs59nOqNtwYntnxIkJiJoTk4IJE/2vCQm86O1sF
+        vfixTTpnlLm2KUTXjIYJyg1I4WUO/RlYMlx0CxZ0PQCcRPyIusqhUDRMh9KVR+nH
+        EMldxzGXtOC90mAHm2BbikK9LDbuOaEogwE6/uJS4QKBgQDnHdFsa5anmiicJwjZ
+        1q5s7VHzqZ3ByUiKjajujccNdxtSSiOMHQx2Z53ylLIUPJAqujcPMe1CjrbM04xf
+        dxOExlOSY0PvD9iWzSC+zoIBB1A70zb41RKFGhLie3/mX8IrLjYna4HvoITnWNYU
+        dDnRBmHbxBE2U0oAdWw2PVZIiQKBgQC1CXJyYibxZP1W8RLYX37+TLy/3aCYglwQ
+        ID/K6IcYtCFcs1LfeCttKrSTz0+/IeAeCpnrSnv3hot64X0BF3bm4T0VV8+GfPWU
+        EF5sh0jKgmUc3r70fhrTu3wUqYjpOKdABmld3LpBoAEcnq8hiJeIcf6cs+WNGFSC
+        fkBuJ7J0mQKBgFyGXnoWVHkCyXFCW1PCk4/+LonrBMI5D/aQIepnDiKA5Yo7LiIA
+        2yVn9B7SkrxxRpIkfLhzl3XG5r33j0IEzOah84EuhlrlsCMnOg3JZNh+kgtxUpep
+        zcFFn/vVz21uNrDMzldXvewuCicINKR5p0/cSz8NLoreK0kluU25npppAoGAHh2C
+        MlDtlX5tPkdAEUphf8AYLfqaOoSE+BHFSuW/g3aDjj4ubQo6fyB5hZUY+PyToau1
+        yxRK5vQ0w6468zGKEAIr/R7sYLzsxUKr0nX2v+lNFK5hKZ7Iq6wmifFh2xoXiGkI
+        ohqTyVLqnG4xR+zG+GWuKzcp2nzPoh2KbkigQRECgYEAmDuBZ0xn6FDw1X8NOQQD
+        pJwfyFt23+uaT1diZcWvi6KHNq2dU8YchLEhFPOsqRi30L6oCspGX6ulm/mvUJw7
+        dCQjZqpClYkxzkb3JfODZTNv/GZ3eivsxKjLgT/8kF53B2tEVmDeLqrDGhG9LoxM
+        rLdgOoOaxmWMgwKx+oMFyOE=
+        -----END PRIVATE KEY-----
+        EOF
+
+        ## Generate ca.json file
+        cat > "/home/step/config/ca.json" << 'EOF'
+        {
+          "root": "/home/step/rootca.crt",
+          "federatedRoots": [],
+          "crt": "/home/step/certs/intermediate-ca.crt",
+          "key": "/home/step/secrets/intermediate-ca.key",
+          "address": ":9000",
+          "insecureAddress": "",
+          "dnsNames": [
+            	"localhost",
+              "smallstep.f5labs.com"
+          ],
+          "logger": {
+            "format": "text"
+          },
+          "db": {
+            "type": "badgerv2",
+            "dataSource": "/home/step/db",
+            "badgerFileLoadingMode": ""
+          },
+          "authority": {
+            "provisioners": [
+              {
+                "type": "ACME",
+                "name": "acme",
+                "forceCN": false,
+                "claims": {
+                  "minTLSCertDuration": "5m",
+                  "maxTLSCertDuration": "2160h",
+                  "defaultTLSCertDuration": "48h"
+                }
+              }
+            ]
+          },
+          "tls": {
+            "cipherSuites": [
+              "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+              "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+            ],
+            "minVersion": 1.2,
+            "maxVersion": 1.3,
+            "renegotiation": false
+          }
+        }
+        EOF
 
         ## Pause for 5 seconds
         sleep 5
@@ -221,10 +320,11 @@ services:
     container_name: bind9
     image: ubuntu/bind9:9.18-22.04_beta
     restart: unless-stopped
+    ports:
+      - '53:53/tcp'
+      - '53:53/udp'
     networks:
       default: {}
-      webserver-net:
-        ipv4_address: 192.168.100.53
     healthcheck:
       test: dig www.example.com  | grep -c "ANSWER SECTION" || exit 1
       interval: 40s
@@ -291,14 +391,14 @@ services:
 
         ; ns entry
         @                IN      NS      ns.
-        @                IN      A       192.168.100.53
+        @                IN      A       10.1.10.53
 
         ; wildcard entry for anything *.f5labs.com
-        pebble           IN      A       192.168.100.20
-        smallstep        IN      A       192.168.100.30
-        www              IN      A       192.168.100.10
-        foo              IN      A       192.168.100.11
-        bar              IN      A       192.168.100.12
+        pebble           IN      A       10.1.10.51
+        smallstep        IN      A       10.1.10.52
+        www              IN      A       10.1.10.120
+        foo              IN      A       10.1.10.121
+        bar              IN      A       10.1.10.122
         EOF
 
         ## Perform additional tweaks
@@ -311,12 +411,3 @@ services:
 networks:
   default:
     driver: bridge
-
-  webserver-net:
-    driver: macvlan
-    driver_opts:
-      parent: ens6.80
-    ipam:
-      driver: default
-      config:
-        - subnet: 192.168.100.0/24
