@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Hook Script
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20251020-1
+## Version: 20260508-1
 ## Description: ACME client hook script used for staging ACME http-01 challenge response, then cleanup
 
 
@@ -199,7 +199,7 @@ deploy_cert() {
 
 
     ## Test if corresponding clientssl profile exists
-    if ($CREATEPROFILE)
+    if [ "$CREATEPROFILE" == "true" ]
     then
         clientssl=true && [[ "$(tmsh list ltm profile client-ssl "${ALIAS}_clientssl" 2>&1)" =~ "was not found" ]] && clientssl=false
 
@@ -208,6 +208,10 @@ deploy_cert() {
             ## Create the clientssl profile
             tmsh create ltm profile client-ssl "${ALIAS}_clientssl" cert-key-chain replace-all-with { ${ALIAS} { key ${ALIAS} cert ${ALIAS} } }
         fi
+    fi
+
+    if [[ ! -z "${DEVICEHOOK}" ]]; then
+        $DEVICEHOOK ${ALIAS}
     fi
 }
 
