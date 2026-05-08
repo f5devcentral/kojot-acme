@@ -73,6 +73,10 @@ DEBUGLOG=false
 ## Set to a Syslog facility and severity level if Syslog is required for log events (ex. local0.err). Leave empty to disable Syslog.
 SYSLOG=""
 
+## Set to the name of a local Bash script to be used to copy a certificate and key to a control plane location. Used to support ACME
+## renewal for device certificates. Example: DEVICEHOOK="/shared/acme/f5devicehook.sh"
+DEVICEHOOK=""
+
 
 ########################################################
 ## DNS-01 PROVIDER SETTINGS ############################
