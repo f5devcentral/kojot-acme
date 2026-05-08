@@ -7,7 +7,8 @@
 
 ## UPDATED TO ADDRESS KOJOT ACME INTEGRATION SUPPORT (search for "KOJOT UPDATE" in script)
 ## UPDATED TO ADD OCT24 dehydrated-io updates (line 1960): https://github.com/dehydrated-io/dehydrated/commit/1dbbc64ce947af000b764e806429e3f87cb3a55e
-## Version: 20251217-01
+## UPDATED TO MOVE CURL_OPTS to the end of the curl request (to honor user-agent overwrite)
+## Version: 202060508-1
 
 set -e
 set -u
@@ -944,14 +945,17 @@ http_request() {
   set +e
   # shellcheck disable=SC2086
   if [[ "${1}" = "head" ]]; then
-    statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -s -w "%{http_code}" -o "${tempcont}" -H 'Cache-Control: no-cache' "${2}" -I)"
+    # statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -s -w "%{http_code}" -o "${tempcont}" -H 'Cache-Control: no-cache' "${2}" -I)"
+    statuscode="$(curl ${ip_version:-} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" ${CURL_OPTS} -s -w "%{http_code}" -o "${tempcont}" -H 'Cache-Control: no-cache' "${2}" -I)"
     curlret="${?}"
     touch "${tempheaders}"
   elif [[ "${1}" = "get" ]]; then
-    statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -L -s -w "%{http_code}" -o "${tempcont}" -D "${tempheaders}" -H 'Cache-Control: no-cache' "${2}")"
+    # statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -L -s -w "%{http_code}" -o "${tempcont}" -D "${tempheaders}" -H 'Cache-Control: no-cache' "${2}")"
+    statuscode="$(curl ${ip_version:-} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" ${CURL_OPTS} -L -s -w "%{http_code}" -o "${tempcont}" -D "${tempheaders}" -H 'Cache-Control: no-cache' "${2}")"
     curlret="${?}"
   elif [[ "${1}" = "post" ]]; then
-    statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -s -w "%{http_code}" -o "${tempcont}" "${2}" -D "${tempheaders}" -H 'Cache-Control: no-cache' -H 'Content-Type: application/jose+json' -d "${3}")"
+    # statuscode="$(curl ${ip_version:-} ${CURL_OPTS} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" -s -w "%{http_code}" -o "${tempcont}" "${2}" -D "${tempheaders}" -H 'Cache-Control: no-cache' -H 'Content-Type: application/jose+json' -d "${3}")"
+    statuscode="$(curl ${ip_version:-} -A "dehydrated/${VERSION} curl/${CURL_VERSION}" ${CURL_OPTS} -s -w "%{http_code}" -o "${tempcont}" "${2}" -D "${tempheaders}" -H 'Cache-Control: no-cache' -H 'Content-Type: application/jose+json' -d "${3}")"
     curlret="${?}"
   else
     set -e
