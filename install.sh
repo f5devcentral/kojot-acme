@@ -43,6 +43,7 @@ process_install() {
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5devicehook.sh -o /shared/acme/f5devicehook.sh && chmod +x /shared/acme/f5devicehook.sh
+        curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5acme-tls-01-builder.sh -o /shared/acme/f5acme-tls-01-builder.sh && chmod +x /shared/acme/f5acme-tls-01-builder.sh
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/config -o /shared/acme/config
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
     else
@@ -51,6 +52,7 @@ process_install() {
         curl -ks ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
         curl -ks ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
         curl -ks ${f5acmehandler_url}/f5devicehook.sh -o /shared/acme/f5devicehook.sh && chmod +x /shared/acme/f5devicehook.sh
+        curl -ks ${f5acmehandler_url}/f5acme-tls-01-builder.sh -o /shared/acme/f5acme-tls-01-builder.sh && chmod +x /shared/acme/f5acme-tls-01-builder.sh
         curl -ks ${f5acmehandler_url}/config -o /shared/acme/config
         curl -ks ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
     fi
