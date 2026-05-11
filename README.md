@@ -2,14 +2,14 @@
 
 ### An ACMEv2 client utility function for integration and advanced features on the F5 BIG-IP
 
-*Major Updates May 08, 2026 - See updates section at bottom for changes*
+*Major Updates May 11, 2026 - See updates section at bottom for changes*
 
 This project defines a set of utility functions for the [Dehydrated](https://github.com/dehydrated-io/dehydrated) ACMEv2 client, supporting direct integration with F5 BIG-IP, and including additional advanced features:
 
 * Simple installation, configuration, and scheduling
 * Supports renewal with existing private keys to enable certificate automation in HSM/FIPS environments
 * Supports per-domain configurations, to multiple ACME providers
-* Supports both the HTTP-01 and DNS-01 validation mechanisms
+* Supports both the HTTP-01, DNS-01, and TLS-ALPN-01 validation mechanisms
 * Supports wildcard certificates for DNS-01 and EAB providers
 * Supports OCSP and periodic revocation testing
 * Supports External Account Binding (EAB)
@@ -28,14 +28,13 @@ Why **Kojot**? Often pronounce "koyot", this is a word for "coyote" that has ori
 <br />
 
 ------------
-<!-- ### ${\textbf{\color{blue}Installation\ and\ Configuration}}$ --->
-${\LARGE{\textnormal{\textbf{\color{blue}Installation\ and\ Configuration}}}}$
+${\Large{\textsf{\color{blue}Installation\ and\ Configuration}}}$
 
 Installation to the BIG-IP is simple. The only constraint is that the certificate objects installed on the BIG-IP **must** be named after the certificate subject name (unless the --alias flag is used). For example, if the certificate subject name is ```www.foo.com```, then the installed certificate and key must also be named ```www.foo.com```. Certificate automation is predicated on this naming construct. To install the utility functions to the BIG-IP:
 
 <br />
 
-* ${\normalsize{\textbf{\color{red}Step\ 1}}}$ (Install): SSH to the BIG-IP shell and run the following command. This will install all required components to the /shared/acme folder on the BIG-IP. In an HA environment, perform this action on both BIG-IP instances.
+* ${\normalsize{\textsf{\color{red}Step\ 1}}}$ (Install): SSH to the BIG-IP shell and run the following command. This will install all required components to the /shared/acme folder on the BIG-IP. In an HA environment, perform this action on both BIG-IP instances.
 
     ```bash
     curl -s https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash
@@ -46,7 +45,7 @@ Installation to the BIG-IP is simple. The only constraint is that the certificat
     curl -ks -x 172.16.1.144:3128 https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash -s -- --proxy 172.16.1.144:3128
     ```
 
-* ${\normalsize{\textbf{\color{red}Step\ 2}}}$ (Certificates Configuration): Update the new ```dg_acme_config``` data group and add entries for each managed domain (certificate subject). You must minimally include the subject/domain (key) and a corresponding ```--ca``` value. In an HA environment, this data group is synced between the peers. See the **Certificates Configuration Options** section below for additional details. Examples:
+* ${\normalsize{\textsf{\color{red}Step\ 2}}}$ (Certificates Configuration): Update the new ```dg_acme_config``` data group and add entries for each managed domain (certificate subject). You must minimally include the subject/domain (key) and a corresponding ```--ca``` value. In an HA environment, this data group is synced between the peers. See the **Certificates Configuration Options** section below for additional details. Examples:
 
     ```lua
     www.foo.com := --ca https://acme-v02.api.letsencrypt.org/directory
@@ -54,74 +53,34 @@ Installation to the BIG-IP is simple. The only constraint is that the certificat
     www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa
     ```
 
-* ${\normalsize{\textbf{\color{red}Step\ 3}}}$ (Provider Configuration): Adjust the default provider configuration ```config``` file in the /shared/acme folder as needed for your specific provider. In most cases you will only need a single provider config file, but this utility allows for per-provider configurations. For example, you can define separate config files when EAB is needed for some provider(s), but not others. In an HA environment, the utility ensures these config files are available to the peer. See the **ACME Provider Configuration Options** section below for additional details.
+* ${\normalsize{\textsf{\color{red}Step\ 3}}}$ (Provider Configuration): Adjust the default provider configuration ```config``` file in the /shared/acme folder as needed for your specific provider. In most cases you will only need a single provider config file, but this utility allows for per-provider configurations. For example, you can define separate config files when EAB is needed for some provider(s), but not others. In an HA environment, the utility ensures these config files are available to the peer. See the **ACME Provider Configuration Options** section below for additional details.
 
-* ${\normalsize{\textbf{\color{red}Step\ 4}}}$ (HTTP Virtual Servers): For HTTP-01 validation, minimally ensure that an HTTP virtual server exists on the BIG-IP that matches the DNS resolution of each target domain (certificate subject). As a function of the ACMEv2 http-01 challenge process, the ACME server will attempt to contact the requested domain IP address on port 80 (HTTP). Attach the ```acme_handler_rule``` iRule to each HTTP virtual server.
+* ${\normalsize{\textsf{\color{red}Step\ 4}}}$ (HTTP Virtual Servers): For HTTP-01 validation, minimally ensure that an HTTP virtual server exists on the BIG-IP that matches the DNS resolution of each target domain (certificate subject). As a function of the ACMEv2 http-01 challenge process, the ACME server will attempt to contact the requested domain IP address on port 80 (HTTP). Attach the ```acme_handler_rule``` iRule to each HTTP virtual server.
 
-* ${\normalsize{\textbf{\color{red}Step\ 5}}}$ (Initial Fetch): Initiate an ACMEv2 fetch. This command will loop through the ```dg_acme_config``` certificates configuration data group and perform required ACMEv2 certificate renewal operations for each configured domain. By default, if no certificate and key exists for a domain, ACMEv2 renewal will generate a new certificate and key. If a private key exists, a CSR is generated from the existing key to renew the certificate only. This it to support HSM/FIPS environments, but can be disabled to always generate a new private key. See the **Utility Command Line Options** and **ACME Povider Configuration Options** sections below for additional details.
+* ${\normalsize{\textsf{\color{red}Step\ 5}}}$ (Initial Fetch): Initiate an ACMEv2 fetch. This command will loop through the ```dg_acme_config``` certificates configuration data group and perform required ACMEv2 certificate renewal operations for each configured domain. By default, if no certificate and key exists for a domain, ACMEv2 renewal will generate a new certificate and key. If a private key exists, a CSR is generated from the existing key to renew the certificate only. This it to support HSM/FIPS environments, but can be disabled to always generate a new private key. See the **Utility Command Line Options** and **ACME Povider Configuration Options** sections below for additional details.
 
     ```bash
     cd /shared/acme
     ./f5acmehandler.sh --verbose
     ```
 
-* ${\normalsize{\textbf{\color{red}Step\ 6}}}$ (Schedule): Once all configuration updates have been made and the utility function is working as desired, define scheduling to automate the process. By default, each domain (certificate) is checked against the defined threshold (default: 30 days) and only continues if the threshold is exceeded. In an HA environment, perform this action on both BIG-IP instances. See the **Scheduling** section below for additional details. For example, to set a weekly schedule, to initiate an update check **every Monday at 4am**:
+* ${\normalsize{\textsf{\color{red}Step\ 6}}}$ (Schedule): Once all configuration updates have been made and the utility function is working as desired, define scheduling to automate the process. By default, each domain (certificate) is checked against the defined threshold (default: 30 days) and only continues if the threshold is exceeded. In an HA environment, perform this action on both BIG-IP instances. See the **Scheduling** section below for additional details. For example, to set a weekly schedule, to initiate an update check **every Monday at 4am**:
 
     ```
     cd /shared/acme
     ./f5acmehandler.sh --schedule "00 04 * * 1"
     ```
 
-* ${\normalsize{\textbf{\color{red}Step\ 7}}}$ (Client SSL Profile): The ```f5acmehandler.sh``` utility maintains the freshness of the certificates (and private keys) installed on the BIG-IP. Ultimately, these certificates and keys will then need to be applied to SSL profiles, and the SSL profiles applied to application virtual servers. Creating the SSL profiles and virtual servers is outside the scope of this utility, but optionally you can set the **CREATEPROFILE** option in the client config file to 'true' to have the utility create a client SSL profile if missing, and attach the certificate and key to that profile.
+* ${\normalsize{\textsf{\color{red}Step\ 7}}}$ (Client SSL Profile): The ```f5acmehandler.sh``` utility maintains the freshness of the certificates (and private keys) installed on the BIG-IP. Ultimately, these certificates and keys will then need to be applied to SSL profiles, and the SSL profiles applied to application virtual servers. Creating the SSL profiles and virtual servers is outside the scope of this utility, but optionally you can set the **CREATEPROFILE** option in the client config file to 'true' to have the utility create a client SSL profile if missing, and attach the certificate and key to that profile.
 
 <br />
 
 ------------
-<!-- ### ${\textbf{\color{blue}Configuration\ Details}}$ --->
-${\LARGE{\textnormal{\textbf{\color{blue}Configuration\ Details}}}}$
+${\Large{\textsf{\color{blue}Configuration\ Details}}}$
 
-The ACMEv2 configuration is broken into two components --> the **provider** configuration that describes the ACMEv2 server (including validation mode, authentication, and revocation settings), and the **certificates** configuration that describes each managed certificate. The provider configuration is stored in ```config``` files in the /shared/acme working folder. A default ```config``` file is included, but others can be created if multiple ACMEv2 providers are needed and require different settings. The certificates configuration is stored in the ```dg_acme_config``` data group and must minimally include the provider URL, but may also point to a specific ```config``` file. If the config file is not specified, the default will be used.
+The ACMEv2 configuration is broken into two components --> the **provider** configuration that describes the ACMEv2 server (including validation mode, authentication, and revocation & renewal settings), and the **certificates** configuration that describes each managed certificate. The provider configuration is stored in ```config``` files in the /shared/acme working folder. A default ```config``` file is included (/shared/acme/config), but others can be created if multiple ACMEv2 providers are needed and require different settings. The certificates configuration is stored in the ```dg_acme_config``` data group and must minimally include the provider URL, but may also point to a specific ```config``` file. If the config file is not specified, the default config file will be used.
 
 Configuration options for this utility are found in the following locations:
-
-<details>
-<summary><b>Certificates Configuration Options</b> define the set of domains that are to be handled, the (CA) directory URL of the designated ACMEv2 provider, and any optional unique configuration settings. This list is maintained in a BIG-IP data group (dg_acme_config)</summary>
-
-<br />
-
-Certificate configuration options are specified in the ```dg_acme_config``` data group for each domain (certificate subject). Each entry in the data group must include a **String**: the domain name (ex. www.foo.com), and a **Value** consisting of a number of configuration options:
-
-<br />
-
-| **Value Options** | **Description**                                                                                                                                                                                                                                                                                             | **Examples**                                                                                                                                                                                                                                                                                                                                               | **Required**                                |
-|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
-| --ca              | Defines the ACME provider URL                                                                                                                                                                                                                                                                               | --ca https://acme-v02.api.letsencrypt.org/directory (Let's Encrypt)</br ><br> --ca https://acme-staging-v02.api.letsencrypt.org/directory (LE Staging)</br ><br> --ca https://acme.zerossl.com/v2/DV90 (ZeroSSL)</br ><br> --ca https://api.buypass.com/acme/directory (Buypass)</br ><br> --ca https://api.test4.buypass.no/acme/directory (Buypass Test) | $${\normalsize{\textbf{\color{red}Yes}}}$$  |
-| --config          | Defines an alternate config file (default: /shared/acme/config)                                                                                                                                                                                                                                             | --config /shared/acme/config_www_foo_com                                                                                                                                                                                                                                                                                                                   | $${\normalsize{\textbf{\color{black}No}}}$$ |
-| -a                | Overrides the required leaf certificate algorithm specified in the config file. (default: rsa)                                                                                                                                                                                                              | -a rsa</br ><br> -a prime256v1</br ><br> -a secp384r1                                                                                                                                                                                                                                                                                                      | $${\normalsize{\textbf{\color{black}No}}}$$ |
-| -d                | Includes additional DNS subject-alternative-name (SAN) values in the certificate. This option can be used multiple times.                                                                                                                                                                                   | -d foo.f5labs.com -d bar.f5labs.com                                                                                                                                                                                                                                                                                                                        | $${\normalsize{\textbf{\color{black}No}}}$$ |
-| --alias           | Allows for wildcard certificate requests on dns-01 and EAB (authenticated http-01) validations. The --alias flag moves the name of the object to the alias context.                                                                                                                                         | --alias wildcard_f5labs_com                                                                                                                                                                                                                                                                                                                                | $${\normalsize{\textbf{\color{black}No}}}$$ |
-| --ocsp            | Adds OCSP monitoring properties to the imported certificate. The --ocsp option points to a predefined OCSP object on the BIG-IP (System > Certificate Management > Traffic Certificate Management > OCSP). When specifying the --ocsp option, the --issuer must also be included.                           | --ocsp my-ocsp-provider --issuer subca.f5labs.com                                                                                                                                                                                                                                                                                                          | $${\normalsize{\textbf{\color{black}No}}}$$ |
-| --issuer          | Adds OCSP monitoring properties to the imported certificate. The --ocsp option points to a predefined CA certificate on the BIG-IP (System > Certificate Management > Traffic Certificate Management > SSL Certificate List). When specifying the --issuer option, the --ocsp option must also be included. | --ocsp my-ocsp-provider --issuer subca.f5labs.com                                                                                                                                                                                                                                                                                                          | $${\normalsize{\textbf{\color{black}No}}}$$ |   
-
-<br />
-
-Examples:
-
-```lua
-www.foo.com := --ca https://acme-v02.api.letsencrypt.org/directory
-www.bar.com := --ca https://acme.zerossl.com/v2/DV90 --config /shared/acme/config_www_example_com
-www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa
-www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa -d foo.baz.com -d bar.baz.com
-*.baz.com := --ca https://acme.locallab.com:9000/directory --alias wildcard_baz_com
-www.bat.com := --ca https://acme-v02.api.letsencrypt.org/directory --ocsp my-ocsp --issuer subca.f5labs.com
-```
-
-***Note the following:***
-* *In using the -d option to include additional SAN values, ACME providers will typically also require validation of these hostnames as well. Ensure that DNS for each of these also resolve to an IP address on the BIG-IP that can answer the ACME challenge.*
-* *The -d option only applies to new certificates. Once a certificate has been created, the ACME renewal will retain the SAN values in the existing certificate.*
-* *The --alias option supports wilcard certificates using either dns-01 validation method, or EAB (pre-authenticated) http-01. In general practice and per RFCs, wildcard certificates are not supported for http-01 validation unless EAB pre-authentication is used.*
-<br />
-</details>
 
 <details>
 <summary><b>Providers Configuration Options</b> define the per-provider ACMEv2 attributes. These settings are maintained in a config text file stored in the "/shared/acme" folder on the BIG-IP.</summary>
@@ -151,13 +110,54 @@ Within the ```/shared/acme/config``` file are a number of additional client attr
 | ERRORLOG             | Set to true to generate error logging (default: true)                                                                                                                                                                                                                           |
 | DEBUGLOG             | Set to true to generate debug logging (default: false)                                                                                                                                                                                                                          |
 | SYSLOG               | Set to a Syslog facility and severity level if Syslog is required for log events (ex. local0.err). Leave empty to disable Syslog.                                                                                                                                               |
+| DEVICEHOOK           | Set to the name of a local Bash script to be used to copy a certificate and key to a control plane location. Used to support ACME renewal for device certificates. Example: DEVICEHOOK="/shared/acme/f5devicehook.sh"                                                           |
 | RENEW_DAYS           | Minimum days before expiration to automatically renew certificate (default: 30)                                                                                                                                                                                                 |
 | OCSP_FETCH           | Fetch OCSP responses (default: no)                                                                                                                                                                                                                                              |
 | OCSP_DAYS            | OCSP refresh interval (default: 5 days)                                                                                                                                                                                                                                         |
 | EAB_KID/EAB_HMAC_KEY | Extended Account Binding (EAB) support                                                                                                                                                                                                                                          |
 | FULLCHAIN            | Set to true to install the complete certificate chain, or false to only install the leaf certificate (default: true)                                                                                                                                                            |
 | ZEROCYLE             | Set to preferred number of zeroization cycles for shredding created private keys (default: 3 cycles)                                                                                                                                                                            |
-| CREATEPROFILE        | Set to true to generate new client SSL profiles with new certs/keys (default: false)                                                                                                                                                                                            |                                                                                                                                                                                          |
+| CREATEPROFILE        | Set to true to generate new client SSL profiles with new certs/keys (default: false)                                                                                                                                                                                            |
+
+</details>
+
+<details>
+<summary><b>Certificates Configuration Options</b> define the set of certificates that are to be handled, the (CA) directory URL of the designated ACMEv2 provider, and any optional unique configuration settings. This list is maintained in a BIG-IP data group (dg_acme_config)</summary>
+
+<br />
+
+Certificate configuration options are specified in the ```dg_acme_config``` data group for each domain (certificate subject). Each entry in the data group must include a **String**: the domain name (ex. www.foo.com), and a **Value** consisting of a number of configuration options:
+
+<br />
+
+| **Value Options** | **Description**                                                                                                                                                                                                                                                                                             | **Examples**                                                                                                                                                                                                                                                                                                                                               | **Required**                                |
+|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
+| --ca              | Defines the ACME provider URL                                                                                                                                                                                                                                                                               | --ca https://acme-v02.api.letsencrypt.org/directory (Let's Encrypt)</br ><br> --ca https://acme-staging-v02.api.letsencrypt.org/directory (LE Staging)</br ><br> --ca https://acme.zerossl.com/v2/DV90 (ZeroSSL)</br ><br> --ca https://api.buypass.com/acme/directory (Buypass)</br ><br> --ca https://api.test4.buypass.no/acme/directory (Buypass Test) | $${\normalsize{\textsf{\color{red}Yes}}}$$  |
+| --config          | Defines an alternate config file (default: /shared/acme/config)                                                                                                                                                                                                                                             | --config /shared/acme/config_www_foo_com                                                                                                                                                                                                                                                                                                                   | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| -a                | Overrides the required leaf certificate algorithm specified in the config file. (default: rsa)                                                                                                                                                                                                              | -a rsa</br ><br> -a prime256v1</br ><br> -a secp384r1                                                                                                                                                                                                                                                                                                      | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| -d                | Includes additional DNS subject-alternative-name (SAN) values in the certificate. This option can be used multiple times.                                                                                                                                                                                   | -d foo.f5labs.com -d bar.f5labs.com                                                                                                                                                                                                                                                                                                                        | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| --alias           | Allows for wildcard certificate requests on dns-01 and EAB (authenticated http-01) validations. The --alias flag moves the name of the object to the alias context.                                                                                                                                         | --alias wildcard_f5labs_com                                                                                                                                                                                                                                                                                                                                | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| --ocsp            | Adds OCSP monitoring properties to the imported certificate. The --ocsp option points to a predefined OCSP object on the BIG-IP (System > Certificate Management > Traffic Certificate Management > OCSP). When specifying the --ocsp option, the --issuer must also be included.                           | --ocsp my-ocsp-provider --issuer subca.f5labs.com                                                                                                                                                                                                                                                                                                          | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| --issuer          | Adds OCSP monitoring properties to the imported certificate. The --ocsp option points to a predefined CA certificate on the BIG-IP (System > Certificate Management > Traffic Certificate Management > SSL Certificate List). When specifying the --issuer option, the --ocsp option must also be included. | --ocsp my-ocsp-provider --issuer subca.f5labs.com                                                                                                                                                                                                                                                                                                          | $${\normalsize{\textsf{\color{black}No}}}$$ |   
+
+<br />
+
+Examples:
+
+```csharp
+www.foo.com := --ca https://acme-v02.api.letsencrypt.org/directory
+www.bar.com := --ca https://acme.zerossl.com/v2/DV90 --config /shared/acme/config_www_example_com
+www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa
+www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa -d foo.baz.com -d bar.baz.com
+*.baz.com   := --ca https://acme.locallab.com:9000/directory --alias wildcard_baz_com
+www.bat.com := --ca https://acme-v02.api.letsencrypt.org/directory --ocsp my-ocsp --issuer subca.f5labs.com
+```
+
+> ***Note the following:***
+> * *In using the -d option to include additional SAN values, ACME providers will typically also require validation of each hostnames as well. Ensure that DNS for each of these also resolve to an IP address on the BIG-IP that can answer the ACME challenge.*
+> * *The -d option only applies to new certificates. Once a certificate has been created, the ACME renewal will retain the SAN values in the existing certificate.*
+> * *The --alias option supports wilcard certificates using either dns-01 validation method, or EAB (pre-authenticated) http-01. In general practice and per RFCs, wildcard certificates are not supported for http-01 validation unless EAB pre-authentication is used.*
+<br />
 </details>
 
 <details>
@@ -165,7 +165,7 @@ Within the ```/shared/acme/config``` file are a number of additional client attr
 
 <br />
 
-The ```f5acmehandler.sh``` utility script also supports a set of commandline options for general maintenance usage. When no command options are specified, the utility loops through the ```dg_acme_config``` data group and performs required ACMEv2 certificate renewal operations for each configured domain.
+The ```f5acmehandler.sh``` utility script also supports a set of commandline options for general maintenance usage. When no command options are specified, the utility loops through the ```dg_acme_config``` data group and performs required ACMEv2 certificate renewal operations for each configured certificate.
 
 | **Command Line Arguments**    | **Description**                                                                                  |
 |-------------------------------|--------------------------------------------------------------------------------------------------|
@@ -222,8 +222,7 @@ crontab -l |grep -v f5acmehandler | crontab
 <br />
 
 ------------
-<!-- ### ${\textbf{\color{blue}ACME\ Protocol\ Flow}}$ --->
-${\LARGE{\textnormal{\textbf{\color{blue}ACME\ Protocol\ Flow}}}}$
+${\Large{\textsf{\color{blue}ACME\ Protocol\ Flow}}}$
 
 Provided below are detailed descriptions of the control flows. The **ACME Utility Architecture** section describes the files and folders in use. The **ACME Functional Flow on BIG-IP** section describes the interaction of ```f5acmehandler``` and ACME client processes. The **ACME Protocol Flow Reference** details the general ACMEv2 protocol flow per [RFC8555](https://datatracker.ietf.org/doc/html/rfc8555).
 
@@ -238,9 +237,10 @@ The f5acmehandler utility contains the following files and folders in the ```/sh
 | /shared/acme/certs/           | The Folder for ephemeral certificate information (CSRs, certificates), cleared after each ACME renewal operation.                  |
 | /shared/acme/config           | A text file containing the client configuration. Multiple provider-specific config files may be created as needed.                 |
 | /shared/acme/config_reporting | A text file containing the smtp reporting configuration.                                                                           |
-| /shared/acme/bin/dehydrated   | The ACME (dehydrated) client script.                                                                                               |
+| /shared/acme/bin/dehydrated   | The ACME (dehydrated) client script. Note that this version is modified from the original.                                         |
 | /shared/acme/f5acmehandler.sh | The ACME client wrapper utility script. This is the script that gets scheduled, and handles all renewal processing.                |
 | /shared/acme/f5hook.sh        | The ACME client hook script. This script is called by the ACME client to handle deploy challenge and clean challenge actions.      |
+| /shared/acme/devicehook.sh    | A template bash script used for ACME-based device certificate management                                                           |
 | /shared/acme/dnsapi           | The folder containing any scripts used to control dns-01 validation deploy and clean DNS entry functions to a remote DNS provider. |
 | acme_handler_rule             | BIG-IP iRule applied to port 80/HTTP VIPs for each application, responsible for handling the ACMEv2 challenge.                     |
 | dg_acme_challenge             | BIG-IP data group used for ephemeral storage of ACMEv2 challenge tokens.                                                           |
@@ -253,10 +253,16 @@ The ```install.sh``` script is called from a Bash shell on the BIG-IP to:
 
 * Create the base ```/shared/acme/``` folder on the BIG-IP
 * Create the /shared/acme/bin and /shared/acme/dnsapi folders
-* Download the ```dehydrated``` ACME client to /shared/acme/bin
 * Create ```the dg_acme_config``` and ```dg_acme_challenge``` data groups on the BIG-IP
 * Create the ```acme_handler_rule``` iRule on the BIG-IP
 * Create the ```/var/log/acmehandler``` log file on the BIG-IP
+* Copy the ```dehydrated``` ACME client to /shared/acme/bin
+* Copy the ```f5acmehandler.sh``` script to /shared/acme
+* Copy the ```f5hook.sh``` script to /shared/acme
+* Copy the ```f5acme-tls-01-builder.sh``` utility script for TLS-ALPN-01 support to /shared/acme
+* Copy the ```config``` default configuration file to /shared/acme
+* Copy the ```config_reporting``` default reporting configuration file to /shared/acme
+
 
 
 <br />
@@ -290,7 +296,7 @@ On ```f5acmehandler.sh``` script initiation, the ```dg_acme_config``` data group
 
 <br />
 
-***Note***: Any key material created in the BIG-IP file system is *zeroized* with a minimal of three wipe cycles. This can be changed by adjusting the **ZEROCYCLE** value in the ```f5hook.sh``` script.
+> ***Note***: Any key material created in the BIG-IP file system is *zeroized* with a minimal of three wipe cycles. This can be changed by adjusting the **ZEROCYCLE** value in the ```f5hook.sh``` script.
 
 <br />
 
@@ -310,8 +316,7 @@ The ACMEv2 protocol process is expertly described in the following diagram
 <br />
 
 ------------
-<!-- ### ${\textbf{\color{blue}Additional\ Configuration\ Options}}$ --->
-${\LARGE{\textnormal{\textbf{\color{blue}Additional\ Configuration\ Options}}}}$
+${\Large{\textsf{\color{blue}Additional\ Configuration\ Options}}}$
 
 Below are descriptions of additional features and environment options.
 
@@ -345,7 +350,7 @@ The ACMEv2 dns-01 validation method follows [RFC8555](https://datatracker.ietf.o
 
 #### Enabling ACMEv2 dns-01 validation
 
-For the two steps above involving manipulation of the DNS TXT record, the client typically uses a set of API calls -- one to deploy (add) the TXT record, and one to clean (delete) the TXT record. This process can also be done manually in a "2-step" method, but the automated approach is preferred if the DNS service supports it. For the automated process, this project supports a "hook" method that calls a separate "dnsapi" script on each function (deploy, clean). The script must be located in the ```dnsapi``` subfolder. A set of working samples are included in the dnsapi repository folder (not copied over in the install), gratuitously borrowed from [acme.sh](https://github.com/acmesh-official/acme.sh/tree/master/dnsapi) and modified for local use. Unfortunately, no two DNS providers have the same API structure, so a different script is needed for each that you will need. To enable ACMEv2 dns-01 validation, perform the following steps:
+For the two steps above involving manipulation of the DNS TXT record, the client typically uses a set of API calls -- one to deploy (add) the TXT record, and one to clean (delete) the TXT record. This process can also be done manually in a "2-step" method, but the automated approach is preferred if the DNS service supports it. For the automated process, this project supports a "hook" method that calls a separate "dnsapi" script on each function (deploy, clean). The script must be located in the ```dnsapi``` subfolder. A set of working samples are included in the dnsapi repository folder (not copied over in the install), many of these gratuitously borrowed from [acme.sh](https://github.com/acmesh-official/acme.sh/tree/master/dnsapi) and modified for local use. Unfortunately, no two DNS providers have the same API structure, so a different script is needed for each that you will need. To enable ACMEv2 dns-01 validation, perform the following steps:
 
 * Create your DNS API script and place it in the ```dnsapi``` subfolder. By convention (not required), the name of the script should start with "dns_", include the name of the DNS provider, and end with the ".sh" file extension. Example:
 
@@ -367,13 +372,13 @@ For the two steps above involving manipulation of the DNS TXT record, the client
     DNSSECRET=6574cV4f92U8Tb476XWY53TVU293WW
     ```
 
-* Optionally update the ```DNS_DELAY``` variable in your provider config file if additional time (in seconds) is needed between deploy and clean functions. In some cases a DNS provider will take some extra time to refresh newly added records.
+* [Optionally] update the ```DNS_DELAY``` variable in your provider config file if additional time (in seconds) is needed between deploy and clean functions. In some cases a DNS provider will take some extra time to refresh newly added records.
 
     ```bash
     DNS_DELAY=30
     ```
 
-* Optionally update the ```DNS_2_PHASE``` variable in your provider config file if the DNS server must be edited manually (not via API). When set to "true", the script will display the DNS TXT record name and token value, and then pause to allow you to go create the record. When done, hit the Enter key to proceed. The script will then pause again to allow you to go delete the record. Hit Enter a second time to complete the request/renewal.
+* [Optionally] update the ```DNS_2_PHASE``` variable in your provider config file if the DNS server must be edited manually (not via API). When set to "true", the script will display the DNS TXT record name and token value, and then pause to allow you to go create the record. When done, hit the Enter key to proceed. The script will then pause again to allow you to go delete the record. Hit Enter a second time to complete the request/renewal.
 
     ```bash
     DNS_2_PHASE="true"
@@ -399,7 +404,7 @@ For the two steps above involving manipulation of the DNS TXT record, the client
 
     Additional functions may also be created to satisfy various tasks, but only the _add() and _rm() functions are called from the hook process.
 
-* The **_add( )** function will receive two values: the full domain name (ex. _acme-challenge.www.f5labs.com), and the token value (ex. "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"). It must then use the DNS provider's API to create a DNS TXT record for the subdomain portion (_acme-challenge.www) in the corresponding DNS zone (f5labs.com), with the value of the token. Once this function completes, issue a ```return 0``` to alert the hook process to notify the ACMEv2 server that validation can continue. Any errors should return 1.
+* The **_add( )** function will receive two values: the full domain name (ex. _acme-challenge.www.f5labs.com), and the token value (ex. "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"). It must then use the DNS provider's API to create a DNS TXT record for the subdomain portion (_acme-challenge.www) in the corresponding DNS zone (f5labs.com), with the value of the token. Once this function completes, it issues a ```return 0``` to alert the hook process to notify the ACMEv2 server that validation can continue. Any errors should ```return 1```.
 
 * The **_rm( )** function will receive two values: the full domain name (ex. _acme-challenge.www.f5labs.com), and the token value (ex. "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"). In most cases, however, only the full domain is needed. It must then use the DNS provider's API to delete the DNS TXT record. Most DNS providers will require you to first query for the record ID, and then delete the record by its ID. Once the function completes, issue a ```return 0``` to alert the hook process to continue. Any errors should return 1. The next step after this will be for the ACMEv2 client to fetch and install the new certificate.
 
@@ -472,6 +477,59 @@ _get_root() {
 
 </details>
 
+
+<details>
+<summary><b>Working with ACMEv2 TLS-ALPN-01 validation</b></summary>
+
+<br />
+
+Like HTTP-01 validation, TLS-ALPN-01 requires that the remote ACME CA service be able to challenge a listener on the client (F5 BIG-IP). For the TLS-ALPN-01 challenge, the client must present a special *ephemeral* certificate in the challenge TLS handshake, where the certificate contains the challenge token. This validation method is considerably more secure than HTTP-01 and less vulnerable to MITM type attacks. An ACME TLS-ALPN-01 TLS handshake uniquely contains an ```acme-tls/1``` ALPN value in the ACME server's TLS client hello payload. In this TLS handshake the ACME server then expects to receive a self-signed server certificate that contains the SHA-256 digest of the challenge token in a special "acmeIdentifier" X.509 extension (1.3.6.1.5.5.7.1.31).
+
+The BIG-IP is not currently able to detect this ALPN value and present an alternate certificate on the same TLS VIP that processes normal TLS application traffic, so to support TLS-ALPN-01 this project creates a VIP overlay environment -- an overlay virtual server is placed in front of the TLS application and simply VIP targets the bulk of inbound TLS traffic. When an ACME TLS-ALPN-01 client hello is received containing the ```acme-tls/1``` ALPN value, a sharedvar signal is sent to an iRule on the "inner" TLS application VIP. This signal allows the TLS application to select a different *ephemeral* client SSL profile at TCP layer 4, before TLS processing has started. To create this overlay environment, a separate ```f5acme-tls-01-builder.sh``` script is provided that the administrator must run from the BIG-IP shell. The ```f5hook.sh``` script will create the ephemeral certificate and key and a corresponding client SSL profile, and then destroy all of these after the ACME process has completed.
+
+![ACME Functional Flow on BIG-IP](images/control-flow-diagram-acme-tlsalpn01.png)
+
+The ```f5acme-tls-01-builder.sh``` script builds the iRules and overlay VIP for a specified TLS application VIP:
+```bash
+Command line options:
+  --verbose: Displays verbose logging to the console
+  --vip: (required) Specifies the target TLS application VIP. This can be the short name if in /Common, or enter the full path
+  --build: Builds all of the configuration objects, but does not swap the IP:port:VLANs to the new outer VIP
+  --apply: Swaps the IP:port:VLANs to the new outer VIP
+  --undo: Swaps the IP:port:VLANs back to the TLS application VIP
+  --list: Lists all acme layered VIPs that are actively listening on a VLAN
+```
+
+To configure for TLS-ALPN-01 support:
+* Run the ```f5acme-tls-01-builder.sh``` script targeting a specific TLS application virtual server. Examples:
+    ```bash
+    ## Build the configuration (overlay VIP, iRules) but does not apply the VIP (no listening VLAN)
+    ./acme-tls-01-builder.sh --verbose --vip my-app-vip --build
+
+    ## Apply the configuration and attach to the listening VLAN (swaps the VLANs from the existing VIP to the overlay VIP)
+    ./acme-tls-01-builder.sh --verbose --vip my-app-vip --apply
+
+    ## Builds and applies the configuration in the same command
+    ./acme-tls-01-builder.sh --verbose --vip my-app-vip --build --apply
+
+    ## Swaps the listening VLAN back to the original TLS application VIP
+    ./acme-tls-01-builder.sh --verbose --vip my-app-vip --undo
+
+    ## Lists all overlay VIPs that are actively listening on a VLAN
+    ./acme-tls-01-builder.sh --list
+    ```
+
+* Ensure that TLS traffic is still correctly getting to the TLS application through the overlay.
+
+* Change the ```ACME_METHOD``` in your config file to "tls-alpn-01".
+
+    ```bash
+    ACME_METHOD="tls-alpn-01"
+    ```
+
+</details>
+
+
 <details>
 <summary><b>Working with wildcard certificates</b></summary>
 
@@ -496,7 +554,11 @@ The name is arbitrary but must follow BIG-IP convention as it will be used as th
 
 <br />
 
-To push log information to Syslog, simply update the ```SYSLOG``` variable in the provider config file to indicate the Syslog facility and severity level (ex.local0.err == local0 facility with "err" severity).
+To push log information to Syslog, simply update the ```SYSLOG``` variable in the provider config file to indicate the Syslog facility and severity level. Example:
+
+```bash
+local0.err == local0 facility with "err" severity
+```
 
 </details>
 
@@ -506,6 +568,10 @@ To push log information to Syslog, simply update the ```SYSLOG``` variable in th
 <br />
 
 To use a certificates configuration data group stored in an alternate partition/folder, update the ```DGCONFIG``` variable directly in the ```f5acmehandler.sh``` script. Use of an alternate partition/folder is generally required when making data group changes via AS3 automation.
+
+```bash
+export DGCONFIG="/Common/my_alternate_dg_acme_config"
+```
 
 </details>
 
@@ -575,15 +641,17 @@ The ACMEv2 protocol is most often used to manage WebPKI certificates. This is es
     ```bash
     DEVICEHOOK="/shared/acme/f5devicehook.sh"
     ```
-    ***Note: Do not populate this variable on the config file used for normal data plane certificate processing***
-
-    When the ```DEVICEHOOK``` variable is populated, the **deploy_cert** function in the ```f5hook.sh``` script will call this separate script at the end of its processing, passing the certificate object name. This project includes a ```f5devicehook.sh``` script as a template. The copy implementation must be derived by the administrator.
+    > ***Note: Do not populate this variable on the config file used for normal data plane certificate processing***
+    > 
+    > When the ```DEVICEHOOK``` variable is populated, the **deploy_cert** function in the ```f5hook.sh``` script will call this separate script at the end of its processing, passing the certificate object name. This project includes a ```f5devicehook.sh``` script as a template. The copy implementation must be derived by the administrator.
 
 </details>
 
 <details>
 <summary><b>Working with High Availability</b></summary>
-    
+   
+<br />
+
 In an HA environment, the ```f5acmehandler.sh``` utility stores state information in iFile objects. On start, account and config state are pulled from the iFiles, and on completion, the account and config state is pushed back to iFiles if any changes are detected:
 
 | **iFile**              | **Description**                                                                                                                                  |
@@ -604,6 +672,8 @@ While account state is always read from and pushed back to iFile (in an HA envir
 
 <details>
 <summary><b>Working with BIG-IQ</b></summary>
+
+<br />
 
 Working with BIG-IQ primarily involves "Script Management", and can broken down into the following set of tasks:
 
@@ -667,6 +737,8 @@ Working with BIG-IQ primarily involves "Script Management", and can broken down 
 <details>
 <summary><b>Reporting</b></summary>
 
+<br />
+
 The f5acmehandler utility can generate reports on renewal functions and send an email via SMTP configuration. This configuration is stored in the ```/shared/acme/config_reporting``` file:
 
 | **Value Options** | **Description**                                                                                                                                                                                                                                       |
@@ -726,6 +798,8 @@ Perform the above upgrade steps on both BIG-IP peers in an HA environment, then 
 <details>
 <summary><b>Uninstall</b></summary>
 
+<br />
+
 To uninstall all objects:
 
 ```bash
@@ -741,8 +815,7 @@ curl -s https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/uninstall
 
 
 ------------
-<!-- ### ${\textbf{\color{blue}Troubleshooting}}$ --->
-${\LARGE{\textnormal{\textbf{\color{blue}Troubleshooting}}}}$
+${\Large{\textsf{\color{blue}Troubleshooting}}}$
 
 <details>
 <summary><b>Error Messaging</b></summary>
@@ -778,8 +851,7 @@ Below are a common set of steps for troubleshooting utility operations:
 <br />
 
 ------------
-<!-- ### ${\textbf{\color{blue}Testing}}$ --->
-${\LARGE{\textnormal{\textbf{\color{blue}Testing}}}}$
+${\Large{\textsf{\color{blue}Testing}}}$
 
 There are a number of ways to test the ```f5acmehandler``` utility, including validation against local ACME services. The **acme-servers** folder contains Docker-Compose options for spinning up local **Smallstep Step-CA** and **Pebble** ACME servers. The following describes a very simple testing scenario using one of these tools.
 
@@ -829,8 +901,7 @@ There are a number of ways to test the ```f5acmehandler``` utility, including va
 <br />
 
 ------------
-<!-- ### ${\textbf{\color{blue}Credits}}$ --->
-${\LARGE{\textnormal{\textbf{\color{blue}Credits}}}}$
+${\Large{\textsf{\color{blue}Credits}}}$
 
 Special thanks to: 
 - [@f5-rahm](https://github.com/f5-rahm) and his [lets-encrypt-python](https://github.com/f5devcentral/lets-encrypt-python) project for inspiration, and for coming up with the cool project name. ;)
@@ -971,6 +1042,13 @@ Special thanks to:
 * Enhancement: Updated the ```docker-compose-combined.yaml``` Docker Compose in the **acme-servers** folder. This Compose can be used to stand up a set of local ACME CA services (Pebble and Smallstep) for testing. Please read the file metadata for instructions on using.
 
 * Enhancement: Added support for device certificate management. Using a separate Bash script and a ```DEVICEHOOK``` variable in the configuration file, an ACME renewed certificate can be copied from the data plane to a place in the control plane to support device certificate updates. See the Additional Configuration Options "Using ACME to update device certificates" section for more details.
+
+</details>
+
+<details>
+<summary><b>Updates: 2026 May 11</b></summary>
+
+* Add support for tls-alpn-01 validation. See the **Working with ACMEv2 TLS-ALPN-01 validation** section in *Additional Configuration Options* for instructions.
 
 </details>
 
