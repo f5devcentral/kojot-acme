@@ -1048,7 +1048,7 @@ Special thanks to:
 <details>
 <summary><b>Updates: 2026 May 11</b></summary>
 
-* Add support for tls-alpn-01 validation. See the **Working with ACMEv2 TLS-ALPN-01 validation** section in *Additional Configuration Options* for instructions.
+* [Issue 31: Add support for the TLS-ALPN-01 challenge](https://github.com/f5devcentral/kojot-acme/issues/31) Add support for tls-alpn-01 validation. See the **Working with ACMEv2 TLS-ALPN-01 validation** section in *Additional Configuration Options* for instructions.
 
 </details>
 
