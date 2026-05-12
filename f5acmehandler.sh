@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Handler Utility
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20260508-1
+## Version: 20260512-1
 ## Description: Wrapper utility script for Dehydrated ACME client
 ## 
 ## Configuration and installation: 
@@ -85,6 +85,7 @@ export CERT_ISSUER=""
 export REPORT
 export VERBOSE="no"
 export DEVICEHOOK=""
+export DNSALIAS=""
 
 ## Function: process_errors --> print error and debug logs to the log file
 f5_process_errors() {
@@ -102,14 +103,31 @@ export -f f5_process_errors
 f5_process_dehydrated() {
    # ./bin/dehydrated "${@:-}"
    # cmd="${@:-}"
-   if [[ ! "${@:-}" =~ "--config " ]]
-   then 
-      ${ACMEDIR}/bin/dehydrated "${@:-}" --config /shared/acme/config
-   else
-      ${ACMEDIR}/bin/dehydrated "${@:-}"
-   fi
-}
+   
+   local IFS=' '
+   local dehcmd="$*"
+   echo "first dehcmd: ${dehcmd}"
 
+   ## Strip --dnsalias and its value if present
+   dehcmd=$(echo "$dehcmd" | sed 's/ --dnsalias [^ ]*//')
+
+   ## Add default --config if not specified
+   if ! echo "$dehcmd" | grep -q -- '--config'; then
+      dehcmd="$dehcmd --config /shared/acme/config"
+   fi
+
+   ## Split string into array and run Dehydrated request
+   read -ra cmd_array <<< "$dehcmd"
+   ${ACMEDIR}/bin/dehydrated "${cmd_array[@]}"
+   
+   # if [[ ! "${@:-}" =~ "--config " ]]
+   # then 
+   #    # ${ACMEDIR}/bin/dehydrated "${@:-}" --config /shared/acme/config
+   # else
+   #    # ${ACMEDIR}/bin/dehydrated "${@:-}"
+   # fi
+   # ${ACMEDIR}/bin/dehydrated "$dehcmd"
+}
 
 ## Function: process_report --> generate and send report via SMTP (requires)
 f5_process_report() {
@@ -342,7 +360,7 @@ f5_process_handler_config() {
       continue 
    fi
 
-   ## Validation check: Does the config entry include a "--alias" option
+   ## Validation check: Does the config entry include a "--alias" option?
    if [[ "$COMMAND" =~ "--alias " ]]
    then
       ALIAS=$(echo "$COMMAND" | sed -E 's/.*(--alias+\s[^[:space:]]+).*/\1/g;s/"//g;s/--alias //g')
@@ -350,7 +368,15 @@ f5_process_handler_config() {
       ALIAS="${DOMAIN}"
    fi
 
-   ## Validation check: Does --ocsp exist without --issuer, and vice-versa
+   ## Validation check: Does the config entry include a "--dnsalias" option?
+   if [[ "$COMMAND" =~ "--dnsalias " ]]
+   then
+      DNSALIAS=$(echo "$COMMAND" | sed -E 's/.*(--dnsalias+\s[^[:space:]]+).*/\1/g;s/"//g;s/--dnsalias //g')
+   else
+      DNSALIAS=""
+   fi
+
+   ## Validation check: Does --ocsp exist without --issuer, and vice-versa?
    if [[ (("$COMMAND" =~ "--ocsp ") && !("$COMMAND" =~ "--issuer ")) || (("$COMMAND" =~ "--issuer ") && !("$COMMAND" =~ "--ocsp ")) ]]
    then
       f5_process_errors "PANIC: Configuration contains either an --ocsp option or --issuer option. Both are required when one is set."
