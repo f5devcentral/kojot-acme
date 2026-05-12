@@ -42,6 +42,7 @@ VALIDATION_TIMEOUT=0
 ## Option to select the ACMEv2 methods: http-01 (default) or dns-01
 ACME_METHOD="http-01"
 ## ACME_METHOD="dns-01"
+## ACME_METHOD="tls-alpn-01"
 
 ## DNS-01 option to perform ACMEv2 dns-01 in 2-phases manually (no API) -- requires an interactive shell to use this feature
 ## Phase1: Manually deploy the TXT records to the DNS service
