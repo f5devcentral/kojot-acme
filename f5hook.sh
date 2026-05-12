@@ -2,7 +2,7 @@
 
 ## F5 BIG-IP ACME Client (Dehydrated) Hook Script
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20260508-1
+## Version: 20260512-1
 ## Description: ACME client hook script used for staging ACME http-01 challenge response, then cleanup
 
 
@@ -62,7 +62,13 @@ deploy_challenge() {
             return 1
         else
             source "${ACMEDIR}/dnsapi/${DNSAPI}.sh"
-            "${DNSAPI}_add" "_acme-challenge.${DOMAIN}" "${TOKEN_VALUE}"
+
+            ## Check if --dnsalias is included. This will overwrite the DOMAIN variable if it exists
+            if [ -n "$DNSALIAS" ]; then
+                "${DNSAPI}_add" "${DNSALIAS}" "${TOKEN_VALUE}"
+            else
+                "${DNSAPI}_add" "_acme-challenge.${DOMAIN}" "${TOKEN_VALUE}"
+            fi
         fi
 
     elif [[ "${ACME_METHOD}" == "dns-01" && "${DNS_2_PHASE}" == "true" ]]
@@ -73,13 +79,43 @@ deploy_challenge() {
             f5_process_errors "PANIC: 2-Phase Manual DNS specified but not in an interactive shell. Quiting.\n"
             exit 1
         else
-            msg1="... 2-Phase Manual DNS - Phase 1 (deploy)\n" 
-            msg2="... Manually update DNS and add a TXT record for: \"_acme-challenge.${DOMAIN}\" with value of: \"${TOKEN_VALUE}\"\n\n"
-            msg3="... Press the Enter key to continue...\n"
-            set -eu -o pipefail
-            echo -e ${msg1}${msg2}${msg3} > /dev/tty
-            read -e < /dev/tty
+            ## Check if --dnsalias is included. This will overwrite the DOMAIN variable if it exists
+            if [ -n "$DNSALIAS" ]; then
+                msg1="... 2-Phase Manual DNS - Phase 1 (deploy)\n" 
+                msg2="... Manually update DNS and add a TXT record for: \"${DNSALIAS}\" with value of: \"${TOKEN_VALUE}\"\n\n"
+                msg3="... Press the Enter key to continue...\n"
+                set -eu -o pipefail
+                echo -e ${msg1}${msg2}${msg3} > /dev/tty
+                read -e < /dev/tty
+            else
+                msg1="... 2-Phase Manual DNS - Phase 1 (deploy)\n" 
+                msg2="... Manually update DNS and add a TXT record for: \"_acme-challenge.${DOMAIN}\" with value of: \"${TOKEN_VALUE}\"\n\n"
+                msg3="... Press the Enter key to continue...\n"
+                set -eu -o pipefail
+                echo -e ${msg1}${msg2}${msg3} > /dev/tty
+                read -e < /dev/tty
+            fi
+            # msg1="... 2-Phase Manual DNS - Phase 1 (deploy)\n" 
+            # msg2="... Manually update DNS and add a TXT record for: \"_acme-challenge.${DOMAIN}\" with value of: \"${TOKEN_VALUE}\"\n\n"
+            # msg3="... Press the Enter key to continue...\n"
+            # set -eu -o pipefail
+            # echo -e ${msg1}${msg2}${msg3} > /dev/tty
+            # read -e < /dev/tty
         fi
+
+    elif [ "${ACME_METHOD}" == "tls-alpn-01" ]
+    then
+        ## TLS-ALPN-01 method defined --> Add a record to the data group
+        f5_process_errors "DEBUG (hook function: deploy_challenge) -- tls-alpn-01 access-method\n"
+        (echo create cli transaction
+        echo install sys crypto key acmetmp__${DOMAIN} from-local-file ${ACMEDIR}/alpn-certs/${DOMAIN}.key.pem
+        echo install sys crypto cert acmetmp__${DOMAIN} from-local-file ${ACMEDIR}/alpn-certs/${DOMAIN}.crt.pem
+        echo create ltm profile client-ssl acmetmp__${DOMAIN} cert acmetmp__${DOMAIN} key acmetmp__${DOMAIN} renegotiation disabled
+        echo submit cli transaction
+        ) | tmsh
+        
+        ## Sleep for a few seconds to allow the system to reconcile
+        sleep 10
 
     else
         ## Exit and log error on unknown method
@@ -114,7 +150,12 @@ clean_challenge() {
             return 1
         else
             source "${ACMEDIR}/dnsapi/${DNSAPI}.sh"
-            "${DNSAPI}_rm" "_acme-challenge.${DOMAIN}" "${TOKEN_VALUE}"
+            ## Check if --dnsalias is included. This will overwrite the DOMAIN variable if it exists
+            if [ -n "$DNSALIAS" ]; then
+                "${DNSAPI}_rm" "${DNSALIAS}" "${TOKEN_VALUE}"
+            else
+                "${DNSAPI}_rm" "_acme-challenge.${DOMAIN}" "${TOKEN_VALUE}"
+            fi
         fi
 
     elif [[ "${ACME_METHOD}" == "dns-01" && "${DNS_2_PHASE}" == "true" ]]
@@ -123,6 +164,17 @@ clean_challenge() {
         echo -n "... 2-Phase Manual DNS - Phase 2 (clean): Manually delete DNS and then press any key to continue..." > /dev/tty
         read -e < /dev/tty
 
+    elif [ "${ACME_METHOD}" == "tls-alpn-01" ]
+    then
+        ## TLS-ALPN-01 method defined --> Add a record to the data group
+        f5_process_errors "DEBUG (hook function: clean_challenge) -- tls-alpn-01 access-method\n"
+        (echo create cli transaction
+        echo delete ltm profile client-ssl acmetmp__${DOMAIN}
+        echo delete sys crypto key acmetmp__${DOMAIN}
+        echo delete sys crypto cert acmetmp__${DOMAIN}
+        echo submit cli transaction
+        ) | tmsh
+        
     else
         ## Exit and log error on unknown method
         f5_process_errors "DEBUG (hook function: deploy_challenge) -- unknown access-method\n"
