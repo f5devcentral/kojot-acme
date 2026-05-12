@@ -2,7 +2,7 @@
 
 ### An ACMEv2 client utility function for integration and advanced features on the F5 BIG-IP
 
-*Major Updates May 11, 2026 - See updates section at bottom for changes*
+*Major Updates May 12, 2026 - See updates section at bottom for changes*
 
 This project defines a set of utility functions for the [Dehydrated](https://github.com/dehydrated-io/dehydrated) ACMEv2 client, supporting direct integration with F5 BIG-IP, and including additional advanced features:
 
@@ -17,6 +17,7 @@ This project defines a set of utility functions for the [Dehydrated](https://git
 * Supports SAN certificate renewal
 * Supports explicit proxy egress
 * Supports granular scheduling
+* Supports DNS-01 alias mode
 * Supports SMTP Reporting
 * Supports high availability
 * Supports debug logging
@@ -130,15 +131,16 @@ Certificate configuration options are specified in the ```dg_acme_config``` data
 
 <br />
 
-| **Value Options** | **Description**                                                                                                                                                                                                                                                                                             | **Examples**                                                                                                                                                                                                                                                                                                                                               | **Required**                                |
-|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
-| --ca              | Defines the ACME provider URL                                                                                                                                                                                                                                                                               | --ca https://acme-v02.api.letsencrypt.org/directory (Let's Encrypt)</br ><br> --ca https://acme-staging-v02.api.letsencrypt.org/directory (LE Staging)</br ><br> --ca https://acme.zerossl.com/v2/DV90 (ZeroSSL)</br ><br> --ca https://api.buypass.com/acme/directory (Buypass)</br ><br> --ca https://api.test4.buypass.no/acme/directory (Buypass Test) | $${\normalsize{\textsf{\color{red}Yes}}}$$  |
-| --config          | Defines an alternate config file (default: /shared/acme/config)                                                                                                                                                                                                                                             | --config /shared/acme/config_www_foo_com                                                                                                                                                                                                                                                                                                                   | $${\normalsize{\textsf{\color{black}No}}}$$ |
-| -a                | Overrides the required leaf certificate algorithm specified in the config file. (default: rsa)                                                                                                                                                                                                              | -a rsa</br ><br> -a prime256v1</br ><br> -a secp384r1                                                                                                                                                                                                                                                                                                      | $${\normalsize{\textsf{\color{black}No}}}$$ |
-| -d                | Includes additional DNS subject-alternative-name (SAN) values in the certificate. This option can be used multiple times.                                                                                                                                                                                   | -d foo.f5labs.com -d bar.f5labs.com                                                                                                                                                                                                                                                                                                                        | $${\normalsize{\textsf{\color{black}No}}}$$ |
-| --alias           | Allows for wildcard certificate requests on dns-01 and EAB (authenticated http-01) validations. The --alias flag moves the name of the object to the alias context.                                                                                                                                         | --alias wildcard_f5labs_com                                                                                                                                                                                                                                                                                                                                | $${\normalsize{\textsf{\color{black}No}}}$$ |
-| --ocsp            | Adds OCSP monitoring properties to the imported certificate. The --ocsp option points to a predefined OCSP object on the BIG-IP (System > Certificate Management > Traffic Certificate Management > OCSP). When specifying the --ocsp option, the --issuer must also be included.                           | --ocsp my-ocsp-provider --issuer subca.f5labs.com                                                                                                                                                                                                                                                                                                          | $${\normalsize{\textsf{\color{black}No}}}$$ |
-| --issuer          | Adds OCSP monitoring properties to the imported certificate. The --ocsp option points to a predefined CA certificate on the BIG-IP (System > Certificate Management > Traffic Certificate Management > SSL Certificate List). When specifying the --issuer option, the --ocsp option must also be included. | --ocsp my-ocsp-provider --issuer subca.f5labs.com                                                                                                                                                                                                                                                                                                          | $${\normalsize{\textsf{\color{black}No}}}$$ |   
+| <div style="width:100px">**Value Options**</div> | **Description**                                                                                                                                                                                                                                                                                             | **Examples**                                                                                                                                                                                                                                                                                                                                       | **Required**                                |
+|--------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
+| --ca                                             | Defines the ACME provider URL                                                                                                                                                                                                                                                                               | --ca https://acme-v02.api.letsencrypt.org/directory (Let's Encrypt)<br><br> --ca https://acme-staging-v02.api.letsencrypt.org/directory (LE Staging)<br><br> --ca https://acme.zerossl.com/v2/DV90 (ZeroSSL)<br><br> --ca https://api.buypass.com/acme/directory (Buypass)<br><br> --ca https://api.test4.buypass.no/acme/directory (Buypass Test) | $${\normalsize{\textsf{\color{red}Yes}}}$$  |
+| --config                                         | Defines an alternate config file (default: /shared/acme/config)                                                                                                                                                                                                                                             | --config /shared/acme/config_www_foo_com                                                                                                                                                                                                                                                                                                           | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| -a                                               | Overrides the required leaf certificate algorithm specified in the config file. (default: rsa)                                                                                                                                                                                                              | -a rsa<br><br> -a prime256v1<br><br> -a secp384r1                                                                                                                                                                                                                                                                                                  | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| -d                                               | Includes additional DNS subject-alternative-name (SAN) values in the certificate. This option can be used multiple times.                                                                                                                                                                                   | -d foo.f5labs.com -d bar.f5labs.com                                                                                                                                                                                                                                                                                                                | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| --alias                                          | Allows for wildcard certificate requests on dns-01 and EAB (authenticated http-01) validations. The --alias flag moves the name of the object to the alias context.                                                                                                                                         | --alias wildcard_f5labs_com                                                                                                                                                                                                                                                                                                                        | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| --ocsp                                           | Adds OCSP monitoring properties to the imported certificate. The --ocsp option points to a predefined OCSP object on the BIG-IP (System > Certificate Management > Traffic Certificate Management > OCSP). When specifying the --ocsp option, the --issuer must also be included.                           | --ocsp my-ocsp-provider --issuer subca.f5labs.com                                                                                                                                                                                                                                                                                                  | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| --issuer                                         | Adds OCSP monitoring properties to the imported certificate. The --ocsp option points to a predefined CA certificate on the BIG-IP (System > Certificate Management > Traffic Certificate Management > SSL Certificate List). When specifying the --issuer option, the --ocsp option must also be included. | --ocsp my-ocsp-provider --issuer subca.f5labs.com                                                                                                                                                                                                                                                                                                  | $${\normalsize{\textsf{\color{black}No}}}$$ |
+| --dnsalias                                       | Allows for DNS-01 alias mode, pointing to an alternate/alias domain name.                                                                                                                                                                                                                                   | --dnsalias _acme-challenge.www.dnsaliastesting.com                                                                                                                                                                                                                                                                                                 | $${\normalsize{\textsf{\color{black}No}}}$$ |
 
 <br />
 
@@ -151,12 +153,14 @@ www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa
 www.baz.com := --ca https://acme.locallab.com:9000/directory -a rsa -d foo.baz.com -d bar.baz.com
 *.baz.com   := --ca https://acme.locallab.com:9000/directory --alias wildcard_baz_com
 www.bat.com := --ca https://acme-v02.api.letsencrypt.org/directory --ocsp my-ocsp --issuer subca.f5labs.com
+www.bab.com := --ca https://acme-v02.api.letsencrypt.org/directory --dnsalias _acme-challenge.bab.dnsaliastesting.com
 ```
 
 > ***Note the following:***
 > * *In using the -d option to include additional SAN values, ACME providers will typically also require validation of each hostnames as well. Ensure that DNS for each of these also resolve to an IP address on the BIG-IP that can answer the ACME challenge.*
 > * *The -d option only applies to new certificates. Once a certificate has been created, the ACME renewal will retain the SAN values in the existing certificate.*
 > * *The --alias option supports wilcard certificates using either dns-01 validation method, or EAB (pre-authenticated) http-01. In general practice and per RFCs, wildcard certificates are not supported for http-01 validation unless EAB pre-authentication is used.*
+> * *The --dnsalias option only works with dns-01 mode, and does not work in conjuction with the --alias option.*
 <br />
 </details>
 
@@ -474,9 +478,7 @@ _get_root() {
 
 ```
 
-
 </details>
-
 
 <details>
 <summary><b>Working with ACMEv2 TLS-ALPN-01 validation</b></summary>
@@ -561,6 +563,49 @@ local0.err == local0 facility with "err" severity
 ```
 
 </details>
+
+<details>
+<summary><b>Working with ACMEv2 DNS-01 alias mode validation</b></summary>
+
+<br />
+
+In some environments you cannot or should not automate DNS changes on your primary/authoritative DNS zone because:
+* The authoritative DNS is managed by a third party or different team
+* The authoritative DNS has no API for automation
+* Security policy forbids giving certificate automation tools write access to production DNS zones
+
+ACMEv2 DNS alias mode shifts the API update to a secondary DNS service by way of a static CNAME created in the authoritative zone, for each certificate domain name.
+
+* Instead of writing the challenge TXT record to primary DNS, create a CNAME record in the primary zone that points to your secondary DNS service. This is a manual step.
+
+    ```bash
+    _acme-challenge.www.f5labs.com -> _acme-challenge.www.dnsaliastesting.com
+    ```
+
+    For example, in a simple Bind zone file configuration:
+
+    ```bash
+    www         IN  CNAME   _acme-challenge.www.dnsaliastesting.com.
+    ```
+
+    The CNAME entry is completely arbitrary except for the zone suffix. It could be "foo.dnsaliastesting.com" or anything else.
+
+* Point the ACME client at this alias zone using the ```--dnsalias``` option in the certificate configuration data group entry. Include the name of the alias entry:
+
+    ```bash
+    www.f5labs.com := --ca https://smallstep.f5labs.com:9000/acme/acme/directory --dnsalias _acme-challenge.www.dnsaliastesting.com
+    ```
+
+    The Kojot ACME client will overwrite the origin domain (ex. www.f5labs.com) with the alias domain (ex. _acme-challenge.www.dnsaliastesting.com) in the call to the DNS API script, and the DNS API script will create a TXT entry in the secondary DNS zone. Ensure that the DNS variables in the config file are set to interact with the secondary zone API.
+
+* The CA follows the CNAME when doing its DNS lookup and will find the TXT record in the alias zone.
+
+> Note: The CNAME is permanent and only needs to be set up once, and for each certificate domain. Every subsequent renewal is fully automated against the alias zone.
+
+<br />
+
+</details>
+
 
 <details>
 <summary><b>Working with certificate configs in alternate partitions</b></summary>
@@ -1052,6 +1097,12 @@ Special thanks to:
 
 </details>
 
+<details>
+<summary><b>Updates: 2026 May 12</b></summary>
+
+* [Issue 35: Add support for the DNS-01 alias mode](https://github.com/f5devcentral/kojot-acme/issues/35) Add support for dns-01 alias mode validation. See the **Working with ACMEv2 DNS-01 alias mode validation** section in *Additional Configuration Options* for instructions.
+
+</details>
 
 <br />
 <br />
