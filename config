@@ -121,6 +121,9 @@ DEVICEHOOK=""
 ## Set to true to generate new client SSL profiles with new certs/keys (default: false)
 #CREATEPROFILE=false
 
+# Set the client ssl profile to use as the parent (default: clientssl)
+#PARENT_CLIENTSSL_PROFILE=clientssl
+
 
 
 ########################################################
