@@ -121,6 +121,7 @@ Within the ```/shared/acme/config``` file are a number of additional client attr
 | FULLCHAIN            | Set to true to install the complete certificate chain, or false to only install the leaf certificate (default: true)                                                                                                                                                            |
 | ZEROCYLE             | Set to preferred number of zeroization cycles for shredding created private keys (default: 3 cycles)                                                                                                                                                                            |
 | CREATEPROFILE        | Set to true to generate new client SSL profiles with new certs/keys (default: false)                                                                                                                                                                                            |
+| PARENT_CLIENTSSL_PROFILE | Name of the existing client SSL profile to use as parent (defaults-from) when CREATEPROFILE is true (default: clientssl)                                                                                                                                                        |
 
 </details>
 

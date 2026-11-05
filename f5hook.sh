@@ -19,6 +19,7 @@ process_config_file() {
     export CREATEPROFILE=false
     export DNS_DELAY=10
     export tmp=""
+    export PARENT_CLIENTSSL_PROFILE=clientssl
 
     . "${CONFIG}"
 }
@@ -259,8 +260,17 @@ deploy_cert() {
 
         if [[ $clientssl == "false" ]]
         then
-            ## Create the clientssl profile
-            tmsh create ltm profile client-ssl "${ALIAS}_clientssl" cert-key-chain replace-all-with { ${ALIAS} { key ${ALIAS} cert ${ALIAS} } }
+            ## Create the clientssl profile, optionally derived from a custom parent profile
+            if [[ -z "${PARENT_CLIENTSSL_PROFILE}" || "${PARENT_CLIENTSSL_PROFILE}" == "clientssl" ]]
+            then
+                tmsh create ltm profile client-ssl "${ALIAS}_clientssl" cert-key-chain replace-all-with { ${ALIAS} { key ${ALIAS} cert ${ALIAS} } }
+            elif [[ "$(tmsh list ltm profile client-ssl "${PARENT_CLIENTSSL_PROFILE}" 2>&1)" =~ "was not found" ]]
+            then
+                f5_process_errors "ERROR: Provided parent client ssl profile ${PARENT_CLIENTSSL_PROFILE} does not exist"
+                return 1
+            else
+                tmsh create ltm profile client-ssl "${ALIAS}_clientssl" cert-key-chain replace-all-with { ${ALIAS} { key ${ALIAS} cert ${ALIAS} } } defaults-from "${PARENT_CLIENTSSL_PROFILE}"
+            fi
         fi
     fi
 
