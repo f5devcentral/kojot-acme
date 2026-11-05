@@ -9,6 +9,30 @@
 ## - Execute: curl -s https://<this-repo-url>/uninstall.sh | bash
 
 
+## Handle --force flag for automation
+FORCE=false
+for arg in "$@"; do
+    if [ "$arg" = "--force" ]; then
+        FORCE=true
+    fi
+done
+
+## Confirmation prompt (skipped with --force)
+if [ "$FORCE" != "true" ]; then
+    read -p "WARNING: This will permanently delete all ACME state in /shared/acme. Type 'YES' to confirm: " confirm
+    if [ "$confirm" != "YES" ]; then
+        echo "Aborted."
+        exit 1
+    fi
+fi
+
+## Create backup before deletion
+if [ -d /shared/acme ]; then
+    tar -czf "/tmp/acme-backup-$(date +%Y%m%d%H%M%S).tar.gz" /shared/acme 2>/dev/null
+    echo "Backup created in /tmp/"
+fi
+
+
 ## Delete log file
 rm -f /var/log/acmehandler > /dev/null 2>&1
 

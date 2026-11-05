@@ -70,7 +70,7 @@ export OCSP_MUST_STAPLE="yes"
 export CONTACT_EMAIL=admin@foo.com
 export KEYSIZE="2048"
 export KEY_ALGO=rsa
-export CURL_OPTS="--http1.1 -k"
+export CURL_OPTS="--http1.1"
 export DNSAPI=""
 export RENEW_DAYS="30"
 export OCSP_FETCH="yes"
@@ -260,7 +260,7 @@ f5_generate_cert_from_csr() {
    f5_process_errors "DEBUG (handler function: f5_generate_cert_from_csr)\n   DOMAIN=${DOMAIN}\n   COMMAND=${COMMAND}\n   ALIAS=${ALIAS}\n"
 
    ## Fetch existing subject-alternative-name (SAN) values from the certificate
-   certsan=$(tmsh list sys crypto cert ${ALIAS} | grep subject-alternative-name | awk '{$1=$1}1' | sed 's/subject-alternative-name//' | sed 's/IP Address:/IP:/')
+   certsan=$(tmsh list sys crypto cert "${ALIAS}" | grep subject-alternative-name | awk '{$1=$1}1' | sed 's/subject-alternative-name//' | sed 's/IP Address:/IP:/')
    ## If certsan is empty, assign the domain/CN value
    if [ -z "$certsan" ]
    then
@@ -268,16 +268,16 @@ f5_generate_cert_from_csr() {
    fi
 
    ## Commencing acme renewal process - first delete and recreate a csr for domain (check first to prevent ltm error log message if CSR doesn't exist)
-   csrexists=false && [[ "$(tmsh list sys crypto csr ${ALIAS} 2>&1)" =~ "${ALIAS}" ]] && csrexists=true
+   csrexists=false && [[ "$(tmsh list sys crypto csr "${ALIAS}" 2>&1)" =~ "${ALIAS}" ]] && csrexists=true
    if ($csrexists)
    then
-      tmsh delete sys crypto csr ${ALIAS} > /dev/null 2>&1
+      tmsh delete sys crypto csr "${ALIAS}" > /dev/null 2>&1
    fi
-   tmsh create sys crypto csr ${ALIAS} common-name ${DOMAIN} subject-alternative-name "${certsan}" key ${ALIAS}
+   tmsh create sys crypto csr "${ALIAS}" common-name "${DOMAIN}" subject-alternative-name "${certsan}" key "${ALIAS}"
    
    ## Dump csr to cert.csr in DOMAIN subfolder
-   mkdir -p ${ACMEDIR}/certs/${ALIAS} 2>&1
-   tmsh list sys crypto csr ${ALIAS} |sed -n '/-----BEGIN CERTIFICATE REQUEST-----/,/-----END CERTIFICATE REQUEST-----/p' > ${ACMEDIR}/certs/${ALIAS}/cert.csr
+   mkdir -p "${ACMEDIR}/certs/${ALIAS}" 2>&1
+   tmsh list sys crypto csr "${ALIAS}" |sed -n '/-----BEGIN CERTIFICATE REQUEST-----/,/-----END CERTIFICATE REQUEST-----/p' > "${ACMEDIR}/certs/${ALIAS}/cert.csr"
    f5_process_errors "DEBUG (handler: csr):\n$(cat ${ACMEDIR}/certs/${ALIAS}/cert.csr | sed 's/^/   /')\n"
 
    ## Trigger ACME client and dump renewed cert to certs/{domain}/cert.pem
@@ -312,15 +312,15 @@ f5_generate_cert_from_csr() {
 
    ## Create transaction to update existing cert and key
    (echo create cli transaction
-      echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem
+      echo install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/cert.pem"
       echo submit cli transaction
    ) | tmsh > /dev/null 2>&1
    f5_process_errors "DEBUG (handler: tmsh transaction) Installed certificate via tmsh transaction\n"
    echo "    Installed certificate via tmsh transaction." >> ${REPORT}
 
    ## Clean up objects
-   tmsh delete sys crypto csr ${ALIAS}
-   rm -rf ${ACMEDIR}/certs/${ALIAS}
+   tmsh delete sys crypto csr "${ALIAS}"
+   [[ -n "${ALIAS}" ]] && rm -rf "${ACMEDIR}/certs/${ALIAS}"
    f5_process_errors "DEBUG (handler: cleanup) Cleaned up CSR and ${ALIAS} folder\n\n"
 }
 
@@ -440,7 +440,7 @@ f5_process_handler_config() {
    f5_process_errors "DEBUG (handler function: f5_process_handler_config)\n   VAR: DOMAIN=${DOMAIN}\n   VAR: COMMAND=${COMMAND}\n"
 
    ## Error test: check if cert exists in BIG-IP config
-   certexists=true && [[ "$(tmsh list sys crypto cert ${ALIAS} 2>&1)" == "" ]] && certexists=false
+   certexists=true && [[ "$(tmsh list sys crypto cert "${ALIAS}" 2>&1)" == "" ]] && certexists=false
 
    if [[ "$ALWAYS_GENERATE_KEY" == "true" ]]
    then
@@ -465,7 +465,7 @@ f5_process_handler_config() {
          ## Certificate exists and is not expired. Check for FORCERENEW and collect today's date and certificate expiration date
          if [[ ! "${FORCERENEW}" == "yes" ]]
          then
-            date_cert=$(tmsh list sys crypto cert ${ALIAS} | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
+            date_cert=$(tmsh list sys crypto cert "${ALIAS}" | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
             date_cert=$(date -d "$date_cert" "+%Y%m%d")
             date_today=$(date +"%Y%m%d")
             date_test=$(( ($(date -d "$date_cert" +%s) - $(date -d "$date_today" +%s)) / 86400 ))
@@ -511,7 +511,7 @@ f5_process_handler_config() {
          ## Certificate exists and is not expired. Check for FORCERENEW and collect today's date and certificate expiration date
          if [[ ! "${FORCERENEW}" == "yes" ]]
          then
-            date_cert=$(tmsh list sys crypto cert ${ALIAS} | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
+            date_cert=$(tmsh list sys crypto cert "${ALIAS}" | grep expiration | awk '{$1=$1}1' | sed 's/expiration //')
             date_cert=$(date -d "$date_cert" "+%Y%m%d")
             date_today=$(date +"%Y%m%d")
             date_test=$(( ($(date -d "$date_cert" +%s) - $(date -d "$date_today" +%s)) / 86400 ))
@@ -561,7 +561,12 @@ f5_process_get_configs() {
       ifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_account_state 2>&1)" =~ "was not found" ]] && ifileexists=false
       if ($ifileexists)
       then
-         cat $(tmsh list sys file ifile f5_acme_account_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | base64 -d | tar xz
+         _ifile_data=$(cat $(tmsh list sys file ifile f5_acme_account_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//'))
+         if echo "$_ifile_data" | base64 -d | tar tz | grep -qE '(^|/)\.\.(/|$)'; then
+             f5_process_errors "PANIC: Malicious path detected in account state archive"
+             return 1
+         fi
+         echo "$_ifile_data" | base64 -d | tar xz
          ACCTSTATEEXISTS="yes"
          f5_process_errors "DEBUG Pulling acme account state information from iFile central storage\n"
       else
@@ -574,7 +579,12 @@ f5_process_get_configs() {
       ifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_dnsapi_state 2>&1)" =~ "was not found" ]] && ifileexists=false
       if ($ifileexists)
       then
-         cat $(tmsh list sys file ifile f5_acme_dnsapi_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | base64 -d | tar xz
+         _ifile_data=$(cat $(tmsh list sys file ifile f5_acme_dnsapi_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//'))
+         if echo "$_ifile_data" | base64 -d | tar tz | grep -qE '(^|/)\.\.(/|$)'; then
+             f5_process_errors "PANIC: Malicious path detected in dnsapi state archive"
+             return 1
+         fi
+         echo "$_ifile_data" | base64 -d | tar xz
          DNSAPISTATEEXISTS="yes"
          f5_process_errors "DEBUG Pulling acme dnsapi state information from iFile central storage\n"
       else
@@ -609,7 +619,12 @@ f5_process_get_configs() {
          confifileexists=true && [[ "$(tmsh list sys file ifile f5_acme_config_state 2>&1)" =~ "was not found" ]] && confifileexists=false
          if ($confifileexists)
          then
-            cat $(tmsh list sys file ifile f5_acme_config_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//') | base64 -d | tar xz
+            _ifile_data=$(cat $(tmsh list sys file ifile f5_acme_config_state -hidden | grep cache-path | sed -E 's/^\s+cache-path\s//'))
+            if echo "$_ifile_data" | base64 -d | tar tz | grep -qE '(^|/)\.\.(/|$)'; then
+                f5_process_errors "PANIC: Malicious path detected in config state archive"
+                return 1
+            fi
+            echo "$_ifile_data" | base64 -d | tar xz
             CONFSTATEEXISTS="yes"
             f5_process_errors "DEBUG Pulling acme config state information from iFile central storage\n"
          else
@@ -794,16 +809,15 @@ f5_process_schedule() {
    testcron=$(echo "$CRON" | sed -E 's/^([[:digit:]\,\-\*\/]+)\s([[:digit:]\,\-\*\/]+)\s([[:digit:]\,\-\*\/]+)\s([[:digit:]\,\-\*\/]+)\s([[:digit:]\,\-\*\/]+)$/match/g')
    if [[ "$testcron" == "match" ]]
    then
-      ## Presumably correct cron string entered --> add to crontab
+      ## Reject shell metacharacters in cron string
+      local _cron_bad_chars='[;&|$`()>]'
+      if [[ "$CRON" =~ $_cron_bad_chars ]]; then
+          printf "\nERROR: Cron string contains disallowed characters. No schedule applied.\n\n"
+          return 1
+      fi
 
-      ## Get current user
-      myuser=$(whoami)
-
-      ## Clear out any existing script entry
-      crontab -l |grep -v f5acmehandler | crontab
-
-      ## Write entry to bottom of the file
-      echo "${CRON} ${ACMEDIR}/f5acmehandler.sh" >> /var/spool/cron/${myuser}
+      ## Presumably correct cron string entered --> add to crontab via crontab API
+      (crontab -l 2>/dev/null | grep -v f5acmehandler; echo "${CRON} ${ACMEDIR}/f5acmehandler.sh") | crontab -
 
       printf "\nThe f5acmehandler script has been scheduled. Current crontab:\n\n"
       crontab -l | sed 's/^/   /'
@@ -990,7 +1004,7 @@ f5_main() {
 }
 
 ## Script entry
-REPORT=$(mktemp)
+REPORT=$(umask 077 && mktemp)
 echo "ACMEv2 Renewal Report: $(date)\n\n" > ${REPORT}
 f5_main "${@:-}"
 

@@ -44,6 +44,8 @@ startup_hook() {
 ## Function: deploy_challenge --> called by ACME client to insert token into dg_acme_challenge data group for ACME server http-01 challenge
 deploy_challenge() {
     local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
+    [[ "$TOKEN_FILENAME" =~ ^[a-zA-Z0-9_-]+$ ]] || { f5_process_errors "ERROR: Invalid TOKEN_FILENAME"; return 1; }
+    [[ "$TOKEN_VALUE" =~ ^[a-zA-Z0-9_.-]+$ ]] || { f5_process_errors "ERROR: Invalid TOKEN_VALUE"; return 1; }
     f5_process_errors "DEBUG (hook function: deploy_challenge)\n   DOMAIN=${DOMAIN}\n   TOKEN_FILENAME=${TOKEN_FILENAME}\n   TOKEN_VALUE=${TOKEN_VALUE}\n"
 
     if [ "${ACME_METHOD}" == "http-01" ]
@@ -135,6 +137,7 @@ deploy_challenge() {
 clean_challenge() {
     ## Delete the record from the data group
     local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
+    [[ "$TOKEN_FILENAME" =~ ^[a-zA-Z0-9_-]+$ ]] || { f5_process_errors "ERROR: Invalid TOKEN_FILENAME"; return 1; }
     f5_process_errors "DEBUG (hook function: clean_challenge)\n   DOMAIN=${DOMAIN}\n   TOKEN_FILENAME=${TOKEN_FILENAME}\n   TOKEN_VALUE=${TOKEN_VALUE}\n"
     if [ "${ACME_METHOD}" == "http-01" ]
     then
@@ -202,10 +205,11 @@ deploy_cert() {
     # ALIAS is a directory name
     ## ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $5 }')" -- fix 22
     ALIAS="$(echo ${KEYFILE} | awk -F\/ '{ print $(NF-1) }')"
+    [[ "$ALIAS" =~ ^[a-zA-Z0-9._-]+$ ]] || { f5_process_errors "ERROR: Invalid ALIAS: ${ALIAS}"; return 1; }
 
     ## Test if cert and key exist
-    key=true && [[ "$(tmsh list sys file ssl-key ${ALIAS} 2>&1)" =~ "was not found" ]] && key=false
-    cert=true && [[ "$(tmsh list sys file ssl-cert ${ALIAS} 2>&1)" =~ "was not found" ]] && cert=false
+    key=true && [[ "$(tmsh list sys file ssl-key "${ALIAS}" 2>&1)" =~ "was not found" ]] && key=false
+    cert=true && [[ "$(tmsh list sys file ssl-cert "${ALIAS}" 2>&1)" =~ "was not found" ]] && cert=false
 
     if ($key && $cert)
     then
@@ -215,8 +219,8 @@ deploy_cert() {
             f5_process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
-            echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-             echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem ${CERT_OCSP_TXT}
+            echo install sys crypto key "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/privkey.pem"
+             echo install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/fullchain.pem" ${CERT_OCSP_TXT}
             echo submit cli transaction
             ) | tmsh
         else
@@ -224,8 +228,8 @@ deploy_cert() {
             f5_process_errors "DEBUG (hook function: deploy_cert -> Updating existing cert and key)\n"
             echo "    Updating existing cert and key." >> ${REPORT}
             (echo create cli transaction
-            echo install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-            echo install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem ${CERT_OCSP_TXT}
+            echo install sys crypto key "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/privkey.pem"
+            echo install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/cert.pem" ${CERT_OCSP_TXT}
             echo submit cli transaction
             ) | tmsh
         fi
@@ -235,21 +239,21 @@ deploy_cert() {
             ## Create cert and key
             f5_process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
-            tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/fullchain.pem ${CERT_OCSP_TXT}
+            tmsh install sys crypto key "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/privkey.pem"
+            tmsh install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/fullchain.pem" ${CERT_OCSP_TXT}
         else
             f5_process_errors "DEBUG (hook function: deploy_cert -> Installing new cert and key)\n"
             echo "    Installing new cert and key." >> ${REPORT}
-            tmsh install sys crypto key ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/privkey.pem
-            tmsh install sys crypto cert ${ALIAS} from-local-file ${ACMEDIR}/certs/${ALIAS}/cert.pem ${CERT_OCSP_TXT}
+            tmsh install sys crypto key "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/privkey.pem"
+            tmsh install sys crypto cert "${ALIAS}" from-local-file "${ACMEDIR}/certs/${ALIAS}/cert.pem" ${CERT_OCSP_TXT}
         fi
     fi
 
     ## Clean up and zeroize local storage (via shred)
-    cd ${ACMEDIR}/certs/${ALIAS}
+    cd "${ACMEDIR}/certs/${ALIAS}" || { f5_process_errors "ERROR: Failed to cd to cert directory for ${ALIAS}"; return 1; }
     find . -type f -print0 | xargs -0 shred -fuz -n ${ZEROCYCLE}
-    cd ${ACMEDIR}/
-    rm -rf ${ACMEDIR}/certs/${ALIAS}/
+    cd "${ACMEDIR}/"
+    [[ -n "${ALIAS}" ]] && rm -rf "${ACMEDIR}/certs/${ALIAS}/"
 
 
     ## Test if corresponding clientssl profile exists
@@ -260,7 +264,7 @@ deploy_cert() {
         if [[ $clientssl == "false" ]]
         then
             ## Create the clientssl profile
-            tmsh create ltm profile client-ssl "${ALIAS}_clientssl" cert-key-chain replace-all-with { ${ALIAS} { key ${ALIAS} cert ${ALIAS} } }
+            tmsh create ltm profile client-ssl "${ALIAS}_clientssl" cert-key-chain replace-all-with { "${ALIAS}" { key "${ALIAS}" cert "${ALIAS}" } }
         fi
     fi
 
@@ -327,6 +331,16 @@ process_config_file
 
 ## Read command argument and call requested function
 HANDLER="$1"; shift
-if [[ "${HANDLER}" =~ ^(deploy_challenge|clean_challenge|sync_cert|deploy_cert|deploy_ocsp|unchanged_cert|invalid_challenge|request_failure|generate_csr|startup_hook|exit_hook)$ ]]; then
-    "$HANDLER" "$@"
-fi
+case "$HANDLER" in
+    deploy_challenge|clean_challenge|sync_cert|deploy_cert|deploy_ocsp|unchanged_cert|invalid_challenge|request_failure|generate_csr|startup_hook|exit_hook)
+        "$HANDLER" "$@"
+        ;;
+    this_hookscript_is_broken__dehydrated_is_working_fine__please_ignore_unknown_hooks_in_your_script)
+        ## Hook that is expected to be called to verify that no random functions can be executed. Expects the script to exit cleanly
+        exit 0
+        ;;
+    *)
+        f5_process_errors "ERROR: Invalid handler: $HANDLER"
+        exit 1
+        ;;
+esac

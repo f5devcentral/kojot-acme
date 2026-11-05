@@ -9,7 +9,7 @@
 ## - Execute: curl -s https://<this-repo-url>/install.sh | bash
 ##
 ##   Optionally include --proxy argument to specify an egress proxy (note double set of double-dashes)
-##            curl -ks -x 172.16.1.144:3128 https://<this-repo-url>/install.sh | bash -s -- --proxy 172.16.1.144:3128
+##            curl -s -x 172.16.1.144:3128 https://<this-repo-url>/install.sh | bash -s -- --proxy 172.16.1.144:3128
 
 
 ## Set download path
@@ -39,23 +39,26 @@ process_install() {
     if [[ ! "${PROXY}" == "no" ]]
     then
         ## Download and place files
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/bin/dehydrated -o /shared/acme/bin/dehydrated && chmod +x /shared/acme/bin/dehydrated
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5devicehook.sh -o /shared/acme/f5devicehook.sh && chmod +x /shared/acme/f5devicehook.sh
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/f5acme-tls-01-builder.sh -o /shared/acme/f5acme-tls-01-builder.sh && chmod +x /shared/acme/f5acme-tls-01-builder.sh
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/config -o /shared/acme/config
-        curl -ks -x "${PROXY}" ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
+        curl -s -x "${PROXY}" ${f5acmehandler_url}/bin/dehydrated -o /shared/acme/bin/dehydrated && chmod +x /shared/acme/bin/dehydrated
+        curl -s -x "${PROXY}" ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
+        curl -s -x "${PROXY}" ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
+        curl -s -x "${PROXY}" ${f5acmehandler_url}/f5devicehook.sh -o /shared/acme/f5devicehook.sh && chmod +x /shared/acme/f5devicehook.sh
+        curl -s -x "${PROXY}" ${f5acmehandler_url}/f5acme-tls-01-builder.sh -o /shared/acme/f5acme-tls-01-builder.sh && chmod +x /shared/acme/f5acme-tls-01-builder.sh
+        curl -s -x "${PROXY}" ${f5acmehandler_url}/config -o /shared/acme/config
+        curl -s -x "${PROXY}" ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
     else
         ## Download and place files
-        curl -ks ${f5acmehandler_url}/bin/dehydrated -o /shared/acme/bin/dehydrated && chmod +x /shared/acme/bin/dehydrated
-        curl -ks ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
-        curl -ks ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
-        curl -ks ${f5acmehandler_url}/f5devicehook.sh -o /shared/acme/f5devicehook.sh && chmod +x /shared/acme/f5devicehook.sh
-        curl -ks ${f5acmehandler_url}/f5acme-tls-01-builder.sh -o /shared/acme/f5acme-tls-01-builder.sh && chmod +x /shared/acme/f5acme-tls-01-builder.sh
-        curl -ks ${f5acmehandler_url}/config -o /shared/acme/config
-        curl -ks ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
+        curl -s ${f5acmehandler_url}/bin/dehydrated -o /shared/acme/bin/dehydrated && chmod +x /shared/acme/bin/dehydrated
+        curl -s ${f5acmehandler_url}/f5acmehandler.sh -o /shared/acme/f5acmehandler.sh && chmod +x /shared/acme/f5acmehandler.sh
+        curl -s ${f5acmehandler_url}/f5hook.sh -o /shared/acme/f5hook.sh && chmod +x /shared/acme/f5hook.sh
+        curl -s ${f5acmehandler_url}/f5devicehook.sh -o /shared/acme/f5devicehook.sh && chmod +x /shared/acme/f5devicehook.sh
+        curl -s ${f5acmehandler_url}/f5acme-tls-01-builder.sh -o /shared/acme/f5acme-tls-01-builder.sh && chmod +x /shared/acme/f5acme-tls-01-builder.sh
+        curl -s ${f5acmehandler_url}/config -o /shared/acme/config
+        curl -s ${f5acmehandler_url}/config_reporting -o /shared/acme/config_reporting
     fi
+
+    ## Set restrictive permissions on config_reporting (contains SMTP credentials)
+    chmod 600 /shared/acme/config_reporting
 
     ## Delete dehydrated if it exists in the root path (upgrade)
     rm -f /shared/acme/dehydrated
