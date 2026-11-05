@@ -48,6 +48,12 @@ Installation to the BIG-IP is simple. The only constraint is that the certificat
     curl -ks -x 172.16.1.144:3128 https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash -s -- --proxy 172.16.1.144:3128
     ```
 
+    For BIG-IPs without any internet access, use the offline install mode. Copy the repository files to the BIG-IP beforehand (```bin/dehydrated```, ```f5acmehandler.sh```, ```f5hook.sh```, ```config```, ```config_reporting``` and optionally ```dnsapi/```, ```f5devicehook.sh``` and ```f5acme-tls-01-builder.sh```) into ```/shared/acme``` (keeping the ```bin/``` and ```dnsapi/``` subfolders) together with ```install.sh```, then run:
+
+    ```bash
+    bash /shared/acme/install.sh --offline
+    ```
+
 * ${\normalsize{\textsf{\color{red}Step\ 2}}}$ (Certificates Configuration): Update the new ```dg_acme_config``` data group and add entries for each managed domain (certificate subject). You must minimally include the subject/domain (key) and a corresponding ```--ca``` value. In an HA environment, this data group is synced between the peers. See the **Certificates Configuration Options** section below for additional details. Examples:
 
     ```lua
