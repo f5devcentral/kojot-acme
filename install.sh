@@ -10,6 +10,11 @@
 ##
 ##   Optionally include --proxy argument to specify an egress proxy (note double set of double-dashes)
 ##            curl -ks -x 172.16.1.144:3128 https://<this-repo-url>/install.sh | bash -s -- --proxy 172.16.1.144:3128
+##
+## - Offline install (no internet access needed): copy the repository files to /shared/acme beforehand
+##   (bin/dehydrated, f5acmehandler.sh, f5hook.sh, config, config_reporting, and optionally dnsapi/,
+##   f5devicehook.sh and f5acme-tls-01-builder.sh), then execute:
+##            bash /shared/acme/install.sh --offline
 
 
 ## Set download path
@@ -35,8 +40,29 @@ process_install() {
     ## Create the log file
     touch /var/log/acmehandler
 
-    ## Install scripts and remote tools, test for proxy argument
-    if [[ ! "${PROXY}" == "no" ]]
+    ## Install scripts and remote tools, test for offline mode and proxy argument
+    if [[ "${OFFLINE}" == "yes" ]]
+    then
+        ## Offline: nothing is downloaded, verify that the required files were pre-staged
+        local required_files=(
+            /shared/acme/bin/dehydrated
+            /shared/acme/f5acmehandler.sh
+            /shared/acme/f5hook.sh
+            /shared/acme/config
+            /shared/acme/config_reporting
+        )
+        local f
+        for f in "${required_files[@]}"; do
+            if [[ ! -f "${f}" ]]; then
+                printf "Error: required file %s not found (offline install).
+" "${f}" >&2
+                exit 1
+            fi
+        done
+        chmod +x /shared/acme/bin/dehydrated /shared/acme/f5acmehandler.sh /shared/acme/f5hook.sh
+        [[ -f /shared/acme/f5devicehook.sh ]] && chmod +x /shared/acme/f5devicehook.sh
+        [[ -f /shared/acme/f5acme-tls-01-builder.sh ]] && chmod +x /shared/acme/f5acme-tls-01-builder.sh
+    elif [[ ! "${PROXY}" == "no" ]]
     then
         ## Download and place files
         curl -ks -x "${PROXY}" ${f5acmehandler_url}/bin/dehydrated -o /shared/acme/bin/dehydrated && chmod +x /shared/acme/bin/dehydrated
@@ -77,6 +103,9 @@ main() {
            fi
            PROXY="${1}"
            ;;
+         --offline)
+           OFFLINE="yes"
+           ;;
          *)
       esac
    shift 1
@@ -88,4 +117,5 @@ main() {
 
 
 PROXY="no"
+OFFLINE="no"
 main "${@:-}"
