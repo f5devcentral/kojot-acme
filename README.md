@@ -6,6 +6,8 @@
 
 *Minor Updates July 10, 2026*
 
+*Minor Updates Nov 18, 2026*
+
 This project defines a set of utility functions for the [Dehydrated](https://github.com/dehydrated-io/dehydrated) ACMEv2 client, supporting direct integration with F5 BIG-IP, and including additional advanced features:
 
 * Simple installation, configuration, and scheduling
@@ -1129,6 +1131,15 @@ Special thanks to:
 <summary><b>Updates: 2026 July 10</b></summary>    
 
 * [Issue 42: DNS_DELAY sleep moved from clean_challenge to deploy_challenge](https://github.com/f5devcentral/kojot-acme/issues/42) Adjusted f5hook.sh to move DNSDELAY to the correct event.
+
+</details>
+
+<details>
+<summary><b>Updates: 2026 November 18</b></summary>    
+
+* Merged PR updates from: [PR 46: feat: add PARENT_CLIENTSSL_PROFILE option](https://github.com/f5devcentral/kojot-acme/pull/46)
+* Merged PR updates from: [PR 47: fix: security hardening of install, handler and hook scripts](https://github.com/f5devcentral/kojot-acme/pull/47)
+* Merged PR updates from: [PR 48: feat: add optional --offline mode to install.sh](https://github.com/f5devcentral/kojot-acme/pull/48)
 
 </details>
 
