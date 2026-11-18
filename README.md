@@ -45,7 +45,7 @@ Installation to the BIG-IP is simple. The only constraint is that the certificat
     Optionally to include a proxy server to access the installation, add the -x (proxy) and --proxy argument (note the double set of double-dashes in Bash argument). The -x is an argument to the command line to use a proxy to fetch the install.sh script, and the --proxy argument is passed to the script itself.
 
     ```bash
-    curl -ks -x 172.16.1.144:3128 https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash -s -- --proxy 172.16.1.144:3128
+    curl -s -x 172.16.1.144:3128 https://raw.githubusercontent.com/f5devcentral/kojot-acme/main/install.sh | bash -s -- --proxy 172.16.1.144:3128
     ```
 
     For BIG-IPs without any internet access, use the offline install mode. Copy the repository files to the BIG-IP beforehand (```bin/dehydrated```, ```f5acmehandler.sh```, ```f5hook.sh```, ```config```, ```config_reporting``` and optionally ```dnsapi/```, ```f5devicehook.sh``` and ```f5acme-tls-01-builder.sh```) into ```/shared/acme``` (keeping the ```bin/``` and ```dnsapi/``` subfolders) together with ```install.sh```, then run:
