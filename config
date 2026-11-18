@@ -1,6 +1,6 @@
 ## F5 BIG-IP ACME Client Provider Configuration File
 ## Maintainer: kevin-at-f5-dot-com
-## Version: 20260512-1
+## Version: 20261118-1
 ## Description: Contains per-provider ACME client configuration settings
 
 
@@ -15,7 +15,7 @@
 #   -k                 = ignore certificate errors
 #   -x <proxy-url>     = use an explicit proxy
 # Ex. CURL_OPTS="--http1.1 -k -x 10.1.10.150:3128"
-CURL_OPTS="--http1.1 -k"
+CURL_OPTS="--http1.1"
 
 # Which public key algorithm should be used? Supported: rsa, prime256v1 and secp384r1 (overridden by -a commandline option)
 KEY_ALGO=rsa
