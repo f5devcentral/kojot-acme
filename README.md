@@ -969,6 +969,27 @@ There are a number of ways to test the ```f5acmehandler``` utility, including va
 <br />
 
 ------------
+${\Large{\textsf{\color{blue}Migrating to BIG-IP Native ACMEv2}}}$
+
+Starting in BIG-IP 21.1, ACMEv2 support (http-01 in 21.1) has been added. While ACME Kojot may continue to address additional use cases and capabilities, BIG-IP ACMEv2 provides an "official" capability that some may require. The good news is that migrating from ACME Kojot to BIG-IP ACME is a fairly straightforward process. Both ACME Kojot and BIG-IP ACME target the certificate/key data structures under the cerificate and key (mcpd) objects, allowing for seemless certificate updates without requiring any configuration reloads. Certificates managed by Kojot ACME can be easily upgraded to BIG-IP ACME with the following simple configuration changes:
+
+* In the HTTP:80 virtual server configured to answer the ACMEv2 http-01 challenges, enable the **ACMEv2 Challenge** option, then remove the **acme_handler_rule** iRule. The aforementioned option will capture any requests to the ACMEv2 challenge URL and respond automatically. If that HTTP:80 virtual server also needs to support an HTTP-to-HTTPS redirect, use the following iRule to ignore the ACME challenge URL:
+
+  ```bash
+  when HTTP_REQUEST {
+    if { !([HTTP::uri] starts_with "/.well-known/acme-challenge") } {
+      HTTP::redirect https://[getfield [HTTP::host] ":" 1][HTTP::uri]
+    }
+  }
+  ```
+
+* Create an ACMEv2 CA Provider object. This is analogous to the Kojot ACME config file and handles the URL and all provider authentication requirements. Navigate to Syetem -> Certificate Management -> Traffic Certificate Management -> ACME Provider List, then click the Create button to create a new ACME CA provider.
+
+* For each managed certificate, set the new ACME CA provider. Navigate to System -> Certificate Management -> Traffic Certificate Management -> SSL Certificate List. For each certificate/key object, go to the Key tab and set the **Provider** option to "ACME Provider", the **ACME Order - Provider** option to the ACME CA provider object, set the **ACME Order - Type** option to "New" or "Renew", then click the **Update** button. Periodically click the **Refresh** button to pull current status of a request/renewal process.
+
+<br />
+
+------------
 ${\Large{\textsf{\color{blue}Credits}}}$
 
 Special thanks to: 
